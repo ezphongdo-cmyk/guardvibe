@@ -70,6 +70,8 @@ export const firebaseRules: SecurityRule[] = [
     pattern: /NEXT_PUBLIC_\w*(?:FIREBASE_SERVICE_ACCOUNT|FIREBASE_ADMIN|FIREBASE_PRIVATE|FIREBASE_SECRET)\w*\s*=/gi,
     languages: ["javascript", "typescript", "shell"],
     fix: "Remove NEXT_PUBLIC_ prefix from Firebase admin/service account credentials. These must be server-side only.",
+    fixCode:
+      "# .env.local — WRONG\n# NEXT_PUBLIC_FIREBASE_SERVICE_ACCOUNT=...\n\n# CORRECT — server-side only\nFIREBASE_SERVICE_ACCOUNT=...\n# Use in API routes: admin.initializeApp({ credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT!)) })",
     compliance: ["SOC2:CC6.1"],
   },
   {

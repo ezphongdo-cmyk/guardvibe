@@ -205,6 +205,8 @@ export const authRules: SecurityRule[] = [
     pattern: /(?:signInWithPassword|signUp)[\s\S]{0,200}?(?:searchParams|query|req\.query|params)[\s\S]{0,100}?password/gi,
     languages: ["javascript", "typescript"],
     fix: "Always send passwords via POST request body, never in URL parameters.",
+    fixCode:
+      '// Send password in request body, not URL:\nconst { data } = await supabase.auth.signInWithPassword({\n  email,\n  password, // from form body, not URL params\n});',
     compliance: ["SOC2:CC6.1", "PCI-DSS:Req8"],
   },
   {
