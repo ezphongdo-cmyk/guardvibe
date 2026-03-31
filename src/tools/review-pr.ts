@@ -29,6 +29,9 @@ interface PrFinding {
   line: number;
   file: string;
   inDiff: boolean;
+  confidence: number;
+  exploitability: "proven" | "likely" | "possible" | "theoretical";
+  impactArea: string;
 }
 
 interface AnnotationOutput {
@@ -85,6 +88,35 @@ function detectLanguage(filePath: string): string | null {
   return CONFIG_FILE_MAP[basename(filePath)] ?? null;
 }
 
+function assessConfidence(rule: SecurityRule, match: string): number {
+  // Higher confidence for specific patterns (secrets, hardcoded values)
+  if (rule.id.startsWith("VG0") || rule.id.startsWith("VG6")) return 0.95; // core + secrets
+  if (rule.severity === "critical") return 0.90;
+  if (rule.severity === "high") return 0.80;
+  if (rule.severity === "medium") return 0.70;
+  return 0.60;
+}
+
+function assessExploitability(rule: SecurityRule): "proven" | "likely" | "possible" | "theoretical" {
+  // Hardcoded secrets, SQL injection, XSS = proven exploitable
+  if (["VG001", "VG002", "VG003", "VG010", "VG042", "VG408"].includes(rule.id)) return "proven";
+  if (rule.severity === "critical") return "likely";
+  if (rule.severity === "high") return "possible";
+  return "theoretical";
+}
+
+function detectImpactArea(file: string, rule: SecurityRule): string {
+  if (file.includes("/api/") || file.includes("route.")) return "API surface";
+  if (file.includes("middleware") || file.includes("proxy.")) return "Auth/routing layer";
+  if (file.includes("action") || file.includes("server")) return "Server action";
+  if (file.includes(".env")) return "Secrets/config";
+  if (file.includes("payment") || file.includes("stripe") || file.includes("checkout")) return "Payment flow";
+  if (file.includes("auth") || file.includes("login") || file.includes("session")) return "Authentication";
+  if (rule.compliance?.some(c => c.includes("PCI"))) return "Payment/PCI scope";
+  if (rule.compliance?.some(c => c.includes("HIPAA"))) return "Healthcare/PHI scope";
+  return "Application code";
+}
+
 function severityToLevel(severity: string): "failure" | "warning" | "notice" {
   if (severity === "critical" || severity === "high") return "failure";
   if (severity === "medium") return "warning";
@@ -122,7 +154,12 @@ export function reviewPr(
 
     for (const f of findings) {
       const inDiff = isLineInDiff(f.line, hunks);
-      allFindings.push({ rule: f.rule, match: f.match, line: f.line, file, inDiff });
+      allFindings.push({
+        rule: f.rule, match: f.match, line: f.line, file, inDiff,
+        confidence: assessConfidence(f.rule, f.match),
+        exploitability: assessExploitability(f.rule),
+        impactArea: detectImpactArea(file, f.rule),
+      });
     }
   }
 
@@ -164,6 +201,9 @@ export function reviewPr(
         owasp: f.rule.owasp, file: f.file, line: f.line, match: f.match,
         inDiff: f.inDiff, fix: f.rule.fix, fixCode: f.rule.fixCode,
         compliance: f.rule.compliance,
+        confidence: f.confidence,
+        exploitability: f.exploitability,
+        impactArea: f.impactArea,
       })),
     });
   }

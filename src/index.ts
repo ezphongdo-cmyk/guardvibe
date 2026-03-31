@@ -21,6 +21,10 @@ import { reviewPr } from "./tools/review-pr.js";
 import { scanSecretsHistory } from "./tools/scan-secrets-history.js";
 import { policyCheck } from "./tools/policy-check.js";
 import { analyzeTaint, formatTaintFindings } from "./tools/taint-analysis.js";
+import { checkCommand } from "./tools/check-command.js";
+import { scanConfigChange } from "./tools/scan-config-change.js";
+import { repoSecurityPosture } from "./tools/repo-posture.js";
+import { explainRemediation } from "./tools/explain-remediation.js";
 import { discoverPlugins } from "./plugins/loader.js";
 import { builtinRules } from "./data/rules/index.js";
 import type { SecurityRule } from "./data/rules/types.js";
@@ -28,7 +32,7 @@ import { loadConfig } from "./utils/config.js";
 
 const server = new McpServer({
   name: "guardvibe",
-  version: "1.5.0",
+  version: "1.6.0",
 });
 
 // Tool 1: Analyze code for security vulnerabilities
@@ -356,6 +360,68 @@ server.tool(
       return { content: [{ type: "text", text: "No tainted data flows detected." }] };
     }
     const results = formatTaintFindings(findings, format);
+    return { content: [{ type: "text", text: results }] };
+  }
+);
+
+// Tool 19: Shell Command Risk Analyzer
+server.tool(
+  "check_command",
+  "Analyze a shell command for security risks before execution. Returns allow/ask/deny verdict with blast radius, safer alternatives, and context-aware risk assessment. Detects: destructive ops, git history rewrites, secret exposure, data exfiltration, deploy triggers, privilege escalation, database drops.",
+  {
+    command: z.string().describe("Shell command to analyze"),
+    cwd: z.string().default(".").describe("Current working directory"),
+    branch: z.string().optional().describe("Current git branch (for branch-specific risk)"),
+    format: z.enum(["markdown", "json"]).default("json").describe("Output format"),
+  },
+  async ({ command, cwd, branch, format }) => {
+    const results = checkCommand(command, cwd, branch, format);
+    return { content: [{ type: "text", text: results }] };
+  }
+);
+
+// Tool 20: Config Change Security Analyzer
+server.tool(
+  "scan_config_change",
+  "Compare before/after versions of a config file to detect security downgrades: CORS relaxation, CSP weakening, HSTS removal, debug mode, cookie flag changes, TLS disabling, new hardcoded secrets, removed security headers.",
+  {
+    before: z.string().describe("Previous config file content"),
+    after: z.string().describe("New config file content"),
+    file_path: z.string().default("config").describe("Config file path for context"),
+    format: z.enum(["markdown", "json"]).default("json").describe("Output format"),
+  },
+  async ({ before, after, file_path, format }) => {
+    const results = scanConfigChange(before, after, file_path, format);
+    return { content: [{ type: "text", text: results }] };
+  }
+);
+
+// Tool 21: Repository Security Posture
+server.tool(
+  "repo_security_posture",
+  "Analyze a repository's overall security posture. Maps sensitive areas (auth, payments, PII, admin, API, infrastructure), identifies high-risk workflows, recommends guard mode, and lists priority fixes.",
+  {
+    path: z.string().describe("Repository root path"),
+    format: z.enum(["markdown", "json"]).default("markdown").describe("Output format"),
+  },
+  async ({ path, format }) => {
+    const results = repoSecurityPosture(path, format);
+    return { content: [{ type: "text", text: results }] };
+  }
+);
+
+// Tool 22: Explain Remediation
+server.tool(
+  "explain_remediation",
+  "Deep explanation of a security finding: why it's risky, real-world impact, exploit scenario, minimum fix, secure alternative, breaking risk assessment, and test strategy. Helps agents apply fixes correctly.",
+  {
+    rule_id: z.string().describe("GuardVibe rule ID (e.g. VG001, VG402)"),
+    code: z.string().optional().describe("Affected code snippet for context"),
+    format: z.enum(["markdown", "json"]).default("markdown").describe("Output format"),
+  },
+  async ({ rule_id, code, format }) => {
+    const rules = (globalThis as any).__guardvibe_rules as SecurityRule[] | undefined;
+    const results = explainRemediation(rule_id, code, format, rules);
     return { content: [{ type: "text", text: results }] };
   }
 );
