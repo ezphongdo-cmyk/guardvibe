@@ -1,0 +1,39 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { databaseRules } from "../../src/data/rules/database.js";
+
+function testRule(ruleId: string, code: string, shouldMatch: boolean) {
+  const rule = databaseRules.find((r) => r.id === ruleId);
+  assert(rule, `Rule ${ruleId} not found`);
+  rule.pattern.lastIndex = 0;
+  const matched = rule.pattern.test(code);
+  assert.strictEqual(
+    matched,
+    shouldMatch,
+    `${ruleId} ${shouldMatch ? "should match" : "should NOT match"}: ${code.substring(0, 80)}`
+  );
+}
+
+describe("Database Rules", () => {
+  it("VG430: detects anon key used server-side", () => {
+    testRule("VG430", "createClient(url, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)", true);
+  });
+  it("VG432: detects Prisma $queryRaw with interpolation", () => {
+    testRule("VG432", "prisma.$queryRaw`SELECT * FROM users WHERE id = ${userId}`", true);
+  });
+  it("VG432: allows Prisma $queryRaw with Prisma.sql", () => {
+    testRule("VG432", "prisma.$queryRaw(Prisma.sql`SELECT * FROM users WHERE id = ${userId}`)", false);
+  });
+  it("VG433: detects $queryRawUnsafe", () => {
+    testRule("VG433", 'prisma.$queryRawUnsafe("SELECT * FROM " + table)', true);
+  });
+  it("VG434: detects Drizzle sql with interpolation", () => {
+    testRule("VG434", "db.execute(sql`SELECT * FROM users WHERE id = ${userId}`)", true);
+  });
+  it("VG435: detects DATABASE_URL in client code", () => {
+    testRule("VG435", '"use client";\nconst url = process.env.DATABASE_URL;', true);
+  });
+  it("VG437: detects service role key in client", () => {
+    testRule("VG437", '"use client";\nconst key = process.env.SUPABASE_SERVICE_ROLE_KEY;', true);
+  });
+});

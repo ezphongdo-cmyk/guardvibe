@@ -1,0 +1,132 @@
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
+import { fixCode } from "../../src/tools/fix-code.js";
+
+describe("fix_code tool", () => {
+  it("returns clean status for safe code", () => {
+    const result = fixCode(
+      'const x = 42;\nconst y = x + 1;',
+      "typescript",
+      undefined,
+      undefined,
+      "json"
+    );
+    const parsed = JSON.parse(result);
+    assert.strictEqual(parsed.status, "clean");
+    assert.strictEqual(parsed.fixes.length, 0);
+  });
+
+  it("returns fix suggestions for hardcoded credentials", () => {
+    const result = fixCode(
+      'const apiKey = "sk-1234567890abcdef1234";',
+      "typescript",
+      undefined,
+      undefined,
+      "json"
+    );
+    const parsed = JSON.parse(result);
+    assert.strictEqual(parsed.status, "issues_found");
+    assert(parsed.total > 0);
+    const fix = parsed.fixes[0];
+    assert(fix.ruleId);
+    assert(fix.fix);
+    assert(fix.line === 1);
+  });
+
+  it("generates patch for hardcoded secret", () => {
+    const result = fixCode(
+      'const password = "super-secret-password-here";',
+      "typescript",
+      undefined,
+      undefined,
+      "json"
+    );
+    const parsed = JSON.parse(result);
+    const fix = parsed.fixes.find((f: any) => f.patch);
+    assert(fix, "Should have a patch suggestion");
+    assert(fix.patch.includes("process.env"));
+  });
+
+  it("generates patch for CORS wildcard", () => {
+    const result = fixCode(
+      'const cors = require("cors");\napp.use(cors({ origin: "*" }));',
+      "typescript",
+      undefined,
+      undefined,
+      "json"
+    );
+    const parsed = JSON.parse(result);
+    const corsFix = parsed.fixes.find((f: any) => f.ruleId === "VG040");
+    assert(corsFix, "Should detect CORS wildcard");
+    assert(corsFix.patch?.includes("ALLOWED_ORIGIN"));
+  });
+
+  it("returns markdown format when requested", () => {
+    const result = fixCode(
+      'const secret = "my-long-secret-value-here";',
+      "typescript",
+      undefined,
+      undefined,
+      "markdown"
+    );
+    assert(result.includes("# GuardVibe Auto-Fix"));
+    assert(result.includes("Suggested patch:"));
+  });
+
+  it("returns clean markdown for safe code", () => {
+    const result = fixCode(
+      'const x = 1;',
+      "typescript",
+      undefined,
+      undefined,
+      "markdown"
+    );
+    assert(result.includes("No security issues found"));
+  });
+
+  it("deduplicates findings by rule+line", () => {
+    const result = fixCode(
+      'const password = "test-password-12345678";',
+      "typescript",
+      undefined,
+      undefined,
+      "json"
+    );
+    const parsed = JSON.parse(result);
+    const line1Fixes = parsed.fixes.filter((f: any) => f.line === 1);
+    const ruleIds = line1Fixes.map((f: any) => f.ruleId);
+    const uniqueRuleIds = [...new Set(ruleIds)];
+    assert.strictEqual(ruleIds.length, uniqueRuleIds.length, "No duplicate rule+line combos");
+  });
+
+  it("sorts fixes by severity (critical first)", () => {
+    const code = [
+      'const secret = "my-super-secret-api-key-12345678";',
+      'app.use(cors({ origin: "*" }));',
+    ].join("\n");
+    const result = fixCode(code, "typescript", undefined, undefined, "json");
+    const parsed = JSON.parse(result);
+    if (parsed.fixes.length >= 2) {
+      const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+      for (let i = 1; i < parsed.fixes.length; i++) {
+        assert(
+          (severityOrder[parsed.fixes[i - 1].severity] ?? 4) <= (severityOrder[parsed.fixes[i].severity] ?? 4),
+          "Fixes should be sorted by severity"
+        );
+      }
+    }
+  });
+
+  it("includes fixCode from rule when available", () => {
+    const result = fixCode(
+      'const password = "hardcoded-password-value-12345";',
+      "typescript",
+      undefined,
+      undefined,
+      "json"
+    );
+    const parsed = JSON.parse(result);
+    const withFixCode = parsed.fixes.find((f: any) => f.fixCode);
+    assert(withFixCode, "At least one fix should have fixCode");
+  });
+});

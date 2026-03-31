@@ -1,0 +1,121 @@
+import type { SecurityRule } from "./types.js";
+
+// Security rules for Supabase, Prisma, and Drizzle ORM
+export const databaseRules: SecurityRule[] = [
+  {
+    id: "VG430",
+    name: "Supabase Anon Key on Server",
+    severity: "high",
+    owasp: "A01:2025 Broken Access Control",
+    description:
+      "Using the anon/public key server-side with createClient bypasses Row Level Security. Use the service_role key, or use createServerClient from @supabase/ssr for cookie-based auth.",
+    pattern: /(?<!createServer)createClient\s*\([\s\S]{0,200}?(?:NEXT_PUBLIC_SUPABASE_ANON_KEY|supabaseAnonKey)(?![\s\S]{0,300}?cookies)/g,
+    languages: ["javascript", "typescript"],
+    fix: "Use SUPABASE_SERVICE_ROLE_KEY on the server, or use createServerClient from @supabase/ssr for cookie-based auth with the anon key.",
+    fixCode:
+      '// Option 1: Service role key (admin access)\nconst supabase = createClient(\n  process.env.SUPABASE_URL!,\n  process.env.SUPABASE_SERVICE_ROLE_KEY!\n);\n\n// Option 2: SSR client with cookies (RLS-aware)\nimport { createServerClient } from "@supabase/ssr";\nconst supabase = createServerClient(url, anonKey, { cookies: { ... } });',
+    compliance: ["SOC2:CC6.6", "HIPAA:§164.312(a)"],
+  },
+  // VG431 removed — "Supabase Missing RLS Warning" triggered on every single
+  // supabase.from().select() call, creating extreme noise (1000+ hits in real projects).
+  // RLS is a database-level config, not detectable from application code patterns.
+  {
+    id: "VG432",
+    name: "Prisma Raw Query Injection",
+    severity: "critical",
+    owasp: "A03:2025 Injection",
+    description:
+      "Prisma $queryRaw or $executeRaw with template literal interpolation. Use Prisma.sql tagged template for safe parameterization.",
+    pattern: /\.\$(?:queryRaw|executeRaw)`[^`]*\$\{(?!Prisma\.)/g,
+    languages: ["javascript", "typescript"],
+    fix: "Use Prisma.sql tagged template for safe parameterization.",
+    fixCode:
+      'import { Prisma } from "@prisma/client";\n\nconst result = await prisma.$queryRaw(\n  Prisma.sql`SELECT * FROM users WHERE id = ${userId}`\n);',
+    compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.1"],
+  },
+  {
+    id: "VG433",
+    name: "Prisma queryRawUnsafe Usage",
+    severity: "critical",
+    owasp: "A03:2025 Injection",
+    description:
+      "$queryRawUnsafe and $executeRawUnsafe pass raw SQL strings without parameterization. Extremely dangerous with user input.",
+    pattern: /\.\$(?:queryRawUnsafe|executeRawUnsafe)\s*\(/g,
+    languages: ["javascript", "typescript"],
+    fix: "Replace with $queryRaw using Prisma.sql tagged template.",
+    fixCode:
+      "const result = await prisma.$queryRaw(\n  Prisma.sql`SELECT * FROM users WHERE id = ${userId}`\n);",
+    compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.1"],
+  },
+  {
+    id: "VG434",
+    name: "Drizzle Unsafe SQL Interpolation",
+    severity: "critical",
+    owasp: "A03:2025 Injection",
+    description:
+      "Drizzle sql tagged template with direct variable interpolation. Use sql.placeholder() for safe parameterization.",
+    pattern: /(?:db\.execute|db\.run|db\.get|db\.all)\s*\(\s*sql`[^`]*\$\{/g,
+    languages: ["javascript", "typescript"],
+    fix: "Use sql.placeholder() for dynamic values in Drizzle queries.",
+    fixCode:
+      'import { sql } from "drizzle-orm";\n\nconst result = await db.execute(\n  sql`SELECT * FROM users WHERE id = ${sql.placeholder("id")}`,\n  { id: userId }\n);',
+    compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.1"],
+  },
+  {
+    id: "VG435",
+    name: "Database URL Client Exposure",
+    severity: "critical",
+    owasp: "A07:2025 Sensitive Data Exposure",
+    description:
+      "DATABASE_URL or DIRECT_URL is accessed in client-side code. This exposes your database connection string to the browser.",
+    pattern: /["']use client["'][\s\S]{0,500}?process\.env\.(?:DATABASE_URL|DIRECT_URL)/g,
+    languages: ["javascript", "typescript"],
+    fix: "Never access database URLs in client components. Use Server Components or API routes.",
+    fixCode:
+      "// Access database only server-side (no 'use client')\nexport default async function Page() {\n  const data = await prisma.user.findMany();\n  return <UserList users={data} />;\n}",
+    compliance: ["SOC2:CC6.1", "PCI-DSS:Req2.3", "HIPAA:§164.312(a)"],
+  },
+  {
+    id: "VG436",
+    name: "NEXT_PUBLIC Database URL",
+    severity: "critical",
+    owasp: "A07:2025 Sensitive Data Exposure",
+    description:
+      "Database URL is prefixed with NEXT_PUBLIC_, exposing it in the client bundle.",
+    pattern:
+      /NEXT_PUBLIC_\w*(?:DATABASE|DB|POSTGRES|MYSQL|MONGO|REDIS|SUPABASE_DB)\w*URL\s*=/gi,
+    languages: ["javascript", "typescript", "shell"],
+    fix: "Remove NEXT_PUBLIC_ prefix. Database URLs must only be server-side.",
+    fixCode:
+      "# WRONG: exposed to client\n# NEXT_PUBLIC_DATABASE_URL=postgresql://...\n\n# CORRECT: server-side only\nDATABASE_URL=postgresql://...",
+    compliance: ["SOC2:CC6.1", "PCI-DSS:Req2.3", "HIPAA:§164.312(a)"],
+  },
+  {
+    id: "VG437",
+    name: "Supabase Service Role Key in Client",
+    severity: "critical",
+    owasp: "A07:2025 Sensitive Data Exposure",
+    description:
+      "SUPABASE_SERVICE_ROLE_KEY is accessed in client-side code. This key bypasses RLS and grants full database access.",
+    pattern: /["']use client["'][\s\S]{0,500}?(?:SUPABASE_SERVICE_ROLE_KEY|SERVICE_ROLE)/g,
+    languages: ["javascript", "typescript"],
+    fix: "Never use the service role key in client code.",
+    fixCode:
+      '// Server-side only\n"use server";\nconst adminClient = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY!);',
+    compliance: ["SOC2:CC6.1", "HIPAA:§164.312(a)"],
+  },
+  {
+    id: "VG438",
+    name: "Supabase Public Storage Bucket",
+    severity: "high",
+    owasp: "A01:2025 Broken Access Control",
+    description:
+      "Supabase storage bucket created with public: true. Without proper RLS policies, all files are accessible to anyone.",
+    pattern: /createBucket\s*\(\s*['"][^'"]+['"]\s*,\s*\{[\s\S]{0,200}?public\s*:\s*true/g,
+    languages: ["javascript", "typescript"],
+    fix: "Add storage RLS policies in Supabase Dashboard. Limit file types and sizes.",
+    fixCode:
+      '// Create bucket with auth requirement\nconst { data } = await supabase.storage.createBucket("avatars", {\n  public: false, // require auth\n  fileSizeLimit: 5 * 1024 * 1024, // 5MB\n  allowedMimeTypes: ["image/png", "image/jpeg"],\n});',
+    compliance: ["SOC2:CC6.1"],
+  },
+];

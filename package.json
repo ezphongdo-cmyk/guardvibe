@@ -1,0 +1,102 @@
+{
+  "name": "guardvibe",
+  "version": "1.3.2",
+  "description": "Security MCP for vibe coding. 239 rules for Next.js, Supabase, Clerk, Stripe, Prisma, tRPC, Hono, GraphQL, Convex, Turso, Uploadthing, AI SDK, and the full AI-generated stack.",
+  "type": "module",
+  "bin": {
+    "guardvibe": "build/index.js",
+    "guardvibe-init": "build/cli.js",
+    "guardvibe-scan": "build/cli.js"
+  },
+  "files": [
+    "build"
+  ],
+  "exports": {
+    ".": "./build/index.js",
+    "./plugins": "./build/plugins/types.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node build/index.js",
+    "prepare": "npm run build",
+    "test": "node --import tsx --test tests/**/*.test.ts"
+  },
+  "keywords": [
+    "mcp",
+    "security",
+    "vibe-coding",
+    "owasp",
+    "vulnerability",
+    "claude",
+    "cursor",
+    "gemini",
+    "codex",
+    "windsurf",
+    "ai-security",
+    "code-audit",
+    "nextjs",
+    "supabase",
+    "stripe",
+    "clerk",
+    "prisma",
+    "drizzle",
+    "vercel",
+    "sast",
+    "secret-detection",
+    "webhook-security",
+    "compliance",
+    "resend",
+    "upstash",
+    "pinecone",
+    "posthog",
+    "cloudflare",
+    "openai",
+    "docker",
+    "terraform",
+    "github-actions",
+    "pre-commit",
+    "sarif",
+    "cve",
+    "react-native",
+    "expo",
+    "firebase",
+    "mcp-server",
+    "prompt-injection",
+    "supply-chain",
+    "trpc",
+    "hono",
+    "graphql",
+    "convex",
+    "turso",
+    "libsql",
+    "uploadthing",
+    "oauth",
+    "csp",
+    "bola",
+    "mass-assignment",
+    "auto-fix"
+  ],
+  "author": "GokLab",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/goklab/guardvibe",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/goklab/guardvibe.git"
+  },
+  "bugs": {
+    "url": "https://github.com/goklab/guardvibe/issues"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

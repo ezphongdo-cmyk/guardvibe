@@ -1,0 +1,48 @@
+import type { SecurityRule } from "./types.js";
+
+export const cicdRules: SecurityRule[] = [
+  {
+    id: "VG210",
+    name: "Secrets interpolated in run step",
+    severity: "critical",
+    owasp: "A01:2025 Broken Access Control",
+    description: "GitHub Actions secrets interpolated directly in run steps can leak via process logs or error messages.",
+    pattern: /run:\s*.*\$\{\{\s*secrets\./gi,
+    languages: ["yaml"],
+    fix: "Pass secrets as environment variables instead of interpolating in run steps.",
+    fixCode: "# Pass secrets via env, not interpolation\nsteps:\n  - run: echo \"deploying\"\n    env:\n      MY_SECRET: ${{ secrets.MY_SECRET }}",
+  },
+  {
+    id: "VG211",
+    name: "pull_request_target with checkout",
+    severity: "critical",
+    owasp: "A01:2025 Broken Access Control",
+    description: "Using pull_request_target with actions/checkout allows untrusted PR code to access secrets.",
+    pattern: /pull_request_target[\s\S]*?actions\/checkout/gi,
+    languages: ["yaml"],
+    fix: "Use pull_request trigger instead, or avoid checking out PR code with pull_request_target.",
+    fixCode: "# Use pull_request instead of pull_request_target\non:\n  pull_request:\n    branches: [main]",
+  },
+  {
+    id: "VG212",
+    name: "Unpinned action version",
+    severity: "medium",
+    owasp: "A03:2025 Software Supply Chain Failures",
+    description: "Using @main or @master for GitHub Actions allows untested code changes to affect your pipeline.",
+    pattern: /uses:\s*\S+@(?:main|master)\s/gi,
+    languages: ["yaml"],
+    fix: "Pin actions to a specific commit SHA or version tag.",
+    fixCode: "# Pin to specific version or SHA\nuses: actions/checkout@v4\n# Or pin to commit SHA:\n# uses: actions/checkout@abc123def456",
+  },
+  {
+    id: "VG213",
+    name: "Overly permissive permissions",
+    severity: "high",
+    owasp: "A01:2025 Broken Access Control",
+    description: "write-all permissions give the workflow full access to the repository. Use least-privilege permissions.",
+    pattern: /permissions:\s*write-all/gi,
+    languages: ["yaml"],
+    fix: "Specify minimum required permissions for each job.",
+    fixCode: "# Use least-privilege permissions\npermissions:\n  contents: read\n  pull-requests: write",
+  },
+];
