@@ -22,7 +22,7 @@ import { loadConfig } from "./utils/config.js";
 
 const server = new McpServer({
   name: "guardvibe",
-  version: "1.3.2",
+  version: "1.3.3",
 });
 
 // Tool 1: Analyze code for security vulnerabilities

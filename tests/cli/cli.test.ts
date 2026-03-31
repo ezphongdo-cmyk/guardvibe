@@ -1,11 +1,13 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, existsSync, rmSync, writeFileSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
 import { execFileSync } from "child_process";
 import { tmpdir } from "os";
+import { fileURLToPath } from "url";
 
-const PROJECT_ROOT = join(import.meta.dirname, "..", "..");
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PROJECT_ROOT = join(__dirname, "..", "..");
 const CLI_PATH = join(PROJECT_ROOT, "src", "cli.ts");
 const TSX_PATH = join(PROJECT_ROOT, "node_modules", "tsx", "dist", "loader.mjs");
 const TEST_DIR = join(tmpdir(), `guardvibe-cli-test-${Date.now()}`);
