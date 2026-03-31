@@ -21,8 +21,9 @@ import { supplyChainRules } from "./supply-chain.js";
 import { cveVersionRules } from "./cve-versions.js";
 import { apiSecurityRules } from "./api-security.js";
 import { modernStackRules } from "./modern-stack.js";
+import { enrichRulesWithCompliance } from "../compliance-metadata.js";
 
-export const owaspRules = [
+export const owaspRules = enrichRulesWithCompliance([
   ...coreRules,
   ...goRules,
   ...dockerfileRules,
@@ -45,7 +46,7 @@ export const owaspRules = [
   ...cveVersionRules,
   ...apiSecurityRules,
   ...modernStackRules,
-];
+]);
 
 // Alias for clarity — these are the built-in rules without plugins
 export const builtinRules = owaspRules;

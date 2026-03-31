@@ -15,6 +15,8 @@ import { complianceReport } from "./tools/compliance-report.js";
 import { exportSarif } from "./tools/export-sarif.js";
 import { checkPackageHealth } from "./tools/check-package-health.js";
 import { fixCode } from "./tools/fix-code.js";
+import { auditConfig } from "./tools/audit-config.js";
+import { generatePolicy } from "./tools/generate-policy.js";
 import { discoverPlugins } from "./plugins/loader.js";
 import { builtinRules } from "./data/rules/index.js";
 import type { SecurityRule } from "./data/rules/types.js";
@@ -22,7 +24,7 @@ import { loadConfig } from "./utils/config.js";
 
 const server = new McpServer({
   name: "guardvibe",
-  version: "1.3.3",
+  version: "1.4.0",
 });
 
 // Tool 1: Analyze code for security vulnerabilities
@@ -131,16 +133,17 @@ server.tool(
 // Tool 5: Scan directory for security vulnerabilities (filesystem-native)
 server.tool(
   "scan_directory",
-  "Scan an entire project directory for security vulnerabilities. Reads files directly from the filesystem — no need to pass file contents. Returns a security score (A-F) and detailed findings.",
+  "Scan an entire project directory for security vulnerabilities. Reads files directly from the filesystem — no need to pass file contents. Returns a security score (A-F) and detailed findings. Includes scan metadata (ID, timestamp, duration, file hashes) for audit trails. Use baseline to compare with a previous scan.",
   {
     path: z.string().describe("Directory path to scan (e.g. './src', '.')"),
     recursive: z.boolean().optional().default(true).describe("Scan subdirectories"),
     exclude: z.array(z.string()).optional().default([]).describe("Additional directories to exclude"),
     format: z.enum(["markdown", "json"]).default("markdown").describe("Output format: markdown (human) or json (machine-readable for agents)"),
+    baseline: z.string().optional().describe("Path to a previous scan JSON output file for baseline comparison (new/fixed/unchanged findings)"),
   },
-  async ({ path, recursive, exclude, format }) => {
+  async ({ path, recursive, exclude, format, baseline }) => {
     const rules = (globalThis as any).__guardvibe_rules as SecurityRule[] | undefined;
-    const results = scanDirectory(path, recursive, exclude, format, rules);
+    const results = scanDirectory(path, recursive, exclude, format, rules, baseline);
     return { content: [{ type: "text", text: results }] };
   }
 );
@@ -191,15 +194,16 @@ server.tool(
 // Tool 9: Generate compliance-focused security report
 server.tool(
   "compliance_report",
-  "Generate a compliance-focused security report mapped to SOC2, PCI-DSS, or HIPAA controls. Scans a directory and groups findings by compliance control.",
+  "Generate a compliance-focused security report mapped to SOC2, PCI-DSS, HIPAA, GDPR, or ISO27001 controls. Scans a directory and groups findings by compliance control. Includes exploit scenarios and audit evidence for each finding. Use mode=executive for a C-level summary.",
   {
     path: z.string().describe("Directory to scan"),
-    framework: z.enum(["SOC2", "PCI-DSS", "HIPAA", "all"]).describe("Compliance framework"),
+    framework: z.enum(["SOC2", "PCI-DSS", "HIPAA", "GDPR", "ISO27001", "all"]).describe("Compliance framework"),
     format: z.enum(["markdown", "json"]).default("markdown").describe("Output format: markdown (human) or json (machine-readable for agents)"),
+    mode: z.enum(["full", "executive"]).default("full").describe("Report mode: full (detailed) or executive (C-level summary)"),
   },
-  async ({ path, framework, format }) => {
+  async ({ path, framework, format, mode }) => {
     const rules = (globalThis as any).__guardvibe_rules as SecurityRule[] | undefined;
-    const results = complianceReport(path, framework, format, rules);
+    const results = complianceReport(path, framework, format, rules, mode);
     return { content: [{ type: "text", text: results }] };
   }
 );
@@ -253,6 +257,34 @@ server.tool(
     return {
       content: [{ type: "text", text: results }],
     };
+  }
+);
+
+// Tool 13: Cross-file configuration security audit
+server.tool(
+  "audit_config",
+  "Audit project configuration files (next.config, middleware/proxy, .env, vercel.json) together for cross-file security issues. Detects gaps that single-file scanning misses: missing security headers, unprotected routes, exposed secrets, middleware/route mismatches.",
+  {
+    path: z.string().describe("Project root directory to audit"),
+    format: z.enum(["markdown", "json"]).default("markdown").describe("Output format"),
+  },
+  async ({ path, format }) => {
+    const results = auditConfig(path, format);
+    return { content: [{ type: "text", text: results }] };
+  }
+);
+
+// Tool 14: Generate security policies based on detected stack
+server.tool(
+  "generate_policy",
+  "Scan a project to detect its stack (Next.js, Supabase, Stripe, etc.) and generate tailored security policies: CSP headers, CORS config, Supabase RLS suggestions, rate limiting config, and security headers.",
+  {
+    path: z.string().describe("Project root directory to scan"),
+    format: z.enum(["markdown", "json"]).default("markdown").describe("Output format"),
+  },
+  async ({ path, format }) => {
+    const results = generatePolicy(path, format);
+    return { content: [{ type: "text", text: results }] };
   }
 );
 

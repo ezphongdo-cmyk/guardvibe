@@ -7,6 +7,8 @@ export interface SecurityRule {
   pattern: RegExp;
   languages: string[];
   fix: string;
-  fixCode?: string;  // NEW: copy-paste-ready secure code example
-  compliance?: string[];  // e.g. ["SOC2:CC6.1", "PCI-DSS:Req6", "HIPAA:§164.312(a)"]
+  fixCode?: string;  // copy-paste-ready secure code example
+  compliance?: string[];  // e.g. ["SOC2:CC6.1", "PCI-DSS:Req6", "HIPAA:§164.312(a)", "GDPR:Art32", "ISO27001:A.8.24"]
+  exploit?: string;  // How this vulnerability can be exploited
+  audit?: string;    // How to demonstrate this in a compliance audit
 }
