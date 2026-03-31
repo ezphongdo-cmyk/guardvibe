@@ -1,6 +1,21 @@
 import { readFileSync } from "fs";
 import { join, resolve } from "path";
 
+export interface PolicyException {
+  ruleId: string;
+  reason: string;
+  approvedBy?: string;
+  expiresAt?: string;  // ISO date — exception expires after this date
+  files?: string[];    // only apply to these files (glob patterns)
+}
+
+export interface CompliancePolicy {
+  frameworks: string[];           // ["SOC2", "GDPR", "ISO27001"]
+  failOn: "critical" | "high" | "medium" | "low";
+  exceptions: PolicyException[];
+  requiredControls?: string[];    // controls that MUST pass, e.g. ["SOC2:CC6.1"]
+}
+
 export interface GuardVibeConfig {
   rules: {
     disable: string[];
@@ -11,12 +26,14 @@ export interface GuardVibeConfig {
     maxFileSize: number;
   };
   plugins: string[];
+  compliance?: CompliancePolicy;
 }
 
 const DEFAULT_CONFIG: GuardVibeConfig = {
   rules: { disable: [], severity: {} },
   scan: { exclude: [], maxFileSize: 500 * 1024 },
   plugins: [],
+  compliance: undefined,
 };
 
 const configCache = new Map<string, GuardVibeConfig>();
@@ -53,6 +70,12 @@ export function loadConfig(dir?: string): GuardVibeConfig {
           ? parsed.scan.maxFileSize : DEFAULT_CONFIG.scan.maxFileSize,
       },
       plugins: Array.isArray(parsed.plugins) ? parsed.plugins : [],
+      compliance: parsed.compliance ? {
+        frameworks: Array.isArray(parsed.compliance.frameworks) ? parsed.compliance.frameworks : [],
+        failOn: parsed.compliance.failOn ?? "high",
+        exceptions: Array.isArray(parsed.compliance.exceptions) ? parsed.compliance.exceptions : [],
+        requiredControls: Array.isArray(parsed.compliance.requiredControls) ? parsed.compliance.requiredControls : undefined,
+      } : undefined,
     };
   } catch {}
 

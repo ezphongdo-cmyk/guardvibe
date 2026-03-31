@@ -1,6 +1,6 @@
 {
   "name": "guardvibe",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Security MCP for vibe coding. 239 rules, 14 tools for Next.js, Supabase, Clerk, Stripe, Prisma, tRPC, Hono, GraphQL, Convex, Turso, Uploadthing, AI SDK, and the full AI-generated stack.",
   "type": "module",
   "bin": {

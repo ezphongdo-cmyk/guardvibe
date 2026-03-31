@@ -17,6 +17,10 @@ import { checkPackageHealth } from "./tools/check-package-health.js";
 import { fixCode } from "./tools/fix-code.js";
 import { auditConfig } from "./tools/audit-config.js";
 import { generatePolicy } from "./tools/generate-policy.js";
+import { reviewPr } from "./tools/review-pr.js";
+import { scanSecretsHistory } from "./tools/scan-secrets-history.js";
+import { policyCheck } from "./tools/policy-check.js";
+import { analyzeTaint, formatTaintFindings } from "./tools/taint-analysis.js";
 import { discoverPlugins } from "./plugins/loader.js";
 import { builtinRules } from "./data/rules/index.js";
 import type { SecurityRule } from "./data/rules/types.js";
@@ -24,7 +28,7 @@ import { loadConfig } from "./utils/config.js";
 
 const server = new McpServer({
   name: "guardvibe",
-  version: "1.4.0",
+  version: "1.5.0",
 });
 
 // Tool 1: Analyze code for security vulnerabilities
@@ -284,6 +288,74 @@ server.tool(
   },
   async ({ path, format }) => {
     const results = generatePolicy(path, format);
+    return { content: [{ type: "text", text: results }] };
+  }
+);
+
+// Tool 15: PR Security Review — diff-only scanning with annotations
+server.tool(
+  "review_pr",
+  "Review a pull request for security issues. Scans only changed lines (diff-only mode) and produces output for GitHub Check Runs, PR comments, or inline annotations. Supports severity gating to block PRs.",
+  {
+    path: z.string().default(".").describe("Repository root path"),
+    base: z.string().default("main").describe("Base branch to diff against"),
+    format: z.enum(["markdown", "json", "annotations"]).default("markdown").describe("Output: markdown (PR comment), json (structured), annotations (GitHub Check Runs)"),
+    diff_only: z.boolean().default(true).describe("Only report findings in changed lines (true) or all findings in changed files (false)"),
+    fail_on: z.enum(["critical", "high", "medium", "low", "none"]).default("high").describe("Block PR if findings at this severity or above exist"),
+  },
+  async ({ path, base, format, diff_only, fail_on }) => {
+    const rules = (globalThis as any).__guardvibe_rules as SecurityRule[] | undefined;
+    const results = reviewPr(path, base, format, diff_only, fail_on, rules);
+    return { content: [{ type: "text", text: results }] };
+  }
+);
+
+// Tool 16: Git History Secret Scan
+server.tool(
+  "scan_secrets_history",
+  "Scan git history for leaked secrets. Finds secrets that were committed in the past — even if they were later removed. Marks each finding as 'active' (still in code) or 'removed' (in git history only, needs rotation).",
+  {
+    path: z.string().describe("Repository root path"),
+    max_commits: z.number().default(100).describe("Maximum number of commits to scan"),
+    format: z.enum(["markdown", "json"]).default("markdown").describe("Output format"),
+  },
+  async ({ path, max_commits, format }) => {
+    const results = scanSecretsHistory(path, max_commits, format);
+    return { content: [{ type: "text", text: results }] };
+  }
+);
+
+// Tool 17: Compliance Policy Check
+server.tool(
+  "policy_check",
+  "Check project against compliance policies defined in .guardviberc. Supports custom frameworks, severity thresholds, required controls, and risk exceptions. Returns pass/fail with details.",
+  {
+    path: z.string().describe("Project root directory"),
+    format: z.enum(["markdown", "json"]).default("markdown").describe("Output format"),
+  },
+  async ({ path, format }) => {
+    const rules = (globalThis as any).__guardvibe_rules as SecurityRule[] | undefined;
+    const results = policyCheck(path, format, rules);
+    return { content: [{ type: "text", text: results }] };
+  }
+);
+
+// Tool 18: Taint/Dataflow Analysis
+server.tool(
+  "analyze_dataflow",
+  "Track user input (request body, URL params, form data) flowing into dangerous sinks (SQL queries, eval, file operations, redirects). Detects injection vulnerabilities that regex rules miss by following variable assignments through code.",
+  {
+    code: z.string().describe("Code to analyze for tainted data flows"),
+    language: z.enum(["javascript", "typescript"]).describe("Language (JS/TS only)"),
+    format: z.enum(["markdown", "json"]).default("markdown").describe("Output format"),
+  },
+  async ({ code, language, format }) => {
+    const findings = analyzeTaint(code, language);
+    if (findings.length === 0) {
+      if (format === "json") return { content: [{ type: "text", text: JSON.stringify({ summary: { total: 0 }, findings: [] }) }] };
+      return { content: [{ type: "text", text: "No tainted data flows detected." }] };
+    }
+    const results = formatTaintFindings(findings, format);
     return { content: [{ type: "text", text: results }] };
   }
 );
