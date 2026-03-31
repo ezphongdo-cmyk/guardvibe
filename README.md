@@ -311,6 +311,19 @@ Tested on a real 644-file Next.js + Supabase project:
 - False positive rate: **near zero** (comment/string filtering, human-readable text detection)
 - Detection rate: **100%** on known vulnerability patterns
 
+## Security
+
+GuardVibe takes supply chain security seriously:
+
+- **npm provenance** — every published version is cryptographically signed via Sigstore, linking the package to this exact GitHub repo and commit. Verify with `npm audit signatures`
+- **2FA enabled** — npm account protected with two-factor authentication
+- **Branch protection** — force push disabled on main, admin enforcement enabled
+- **Tag protection** — version tags (`v*`) cannot be deleted or force-pushed
+- **Minimal CI permissions** — GitHub Actions workflows use `permissions: contents: read` only
+- **Zero runtime dependencies** — only MCP SDK and Zod (both widely audited)
+
+To report a vulnerability, please email security@goklab.com or open a GitHub issue.
+
 ## License
 
 Apache 2.0 — open source, patent-safe, enterprise-ready. Built by [GokLab](https://github.com/goklab).
