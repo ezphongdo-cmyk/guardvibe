@@ -70,6 +70,8 @@ export const reactNativeRules: SecurityRule[] = [
     pattern: /(?:fetch|axios|http)\s*[\.\(][\s\S]{0,200}?(?:api\.|\/api\/)[\s\S]{0,300}?(?:Authorization|Bearer|token)/gi,
     languages: ["javascript", "typescript"],
     fix: "Implement certificate pinning using react-native-ssl-pinning or expo-certificate-transparency.",
+    fixCode:
+      '// Use react-native-ssl-pinning\nimport { fetch } from "react-native-ssl-pinning";\nconst res = await fetch("https://api.example.com/data", {\n  sslPinning: { certs: ["api-cert"] },\n  headers: { Authorization: `Bearer ${token}` },\n});',
     compliance: ["SOC2:CC6.1", "PCI-DSS:Req4"],
   },
   {
@@ -93,6 +95,8 @@ export const reactNativeRules: SecurityRule[] = [
     pattern: /NSAppTransportSecurity[\s\S]{0,200}?NSAllowsArbitraryLoads[\s\S]{0,50}?(?:true|YES|<true\s*\/>)/gi,
     languages: ["xml", "json", "javascript", "typescript"],
     fix: "Do not disable ATS. If specific domains need HTTP, use NSExceptionDomains instead of blanket allow.",
+    fixCode:
+      "<!-- Info.plist — allow HTTP only for specific domains -->\n<key>NSAppTransportSecurity</key>\n<dict>\n  <key>NSExceptionDomains</key>\n  <dict>\n    <key>legacy-api.example.com</key>\n    <dict>\n      <key>NSTemporaryExceptionAllowsInsecureHTTPLoads</key>\n      <true/>\n    </dict>\n  </dict>\n</dict>",
     compliance: ["SOC2:CC6.1", "PCI-DSS:Req4"],
   },
   {
@@ -116,6 +120,8 @@ export const reactNativeRules: SecurityRule[] = [
     pattern: /NativeModules\.\w+\.\w+\s*\([\s\S]{0,200}?(?:token|secret|password|key|credential|jwt|session)/gi,
     languages: ["javascript", "typescript"],
     fix: "Encrypt sensitive data before passing through the bridge. Use native secure storage instead.",
+    fixCode:
+      '// Use secure storage instead of passing through bridge\nimport * as SecureStore from "expo-secure-store";\nawait SecureStore.setItemAsync("authToken", token);\n\n// Read securely\nconst token = await SecureStore.getItemAsync("authToken");',
     compliance: ["SOC2:CC6.1"],
   },
 ];

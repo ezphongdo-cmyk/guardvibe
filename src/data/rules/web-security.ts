@@ -23,6 +23,8 @@ export const webSecurityRules: SecurityRule[] = [
     pattern: /(?:webhook_?secret|signing_?secret|whsec_)\s*[:=]\s*["'][A-Za-z0-9_\-]{12,}["']/gi,
     languages: ["javascript", "typescript"],
     fix: "Use environment variables for webhook secrets.",
+    fixCode:
+      "// Use environment variable\nconst webhookSecret = process.env.WEBHOOK_SECRET!;\n\n// .env.local\nWEBHOOK_SECRET=whsec_your_secret_here",
     compliance: ["SOC2:CC6.1"],
   },
 
@@ -36,6 +38,8 @@ export const webSecurityRules: SecurityRule[] = [
     pattern: /NEXT_PUBLIC_\w*(?:SECRET|PRIVATE|SERVICE_ROLE|API_KEY|ACCESS_TOKEN|AUTH_TOKEN|SIGNING|WEBHOOK)\w*\s*=/gi,
     languages: ["shell", "javascript", "typescript"],
     fix: "Remove NEXT_PUBLIC_ prefix from sensitive credentials. Access them only in server-side code.",
+    fixCode:
+      "# .env.local — WRONG\n# NEXT_PUBLIC_API_KEY=sk_live_xxx\n\n# CORRECT — server-side only\nAPI_KEY=sk_live_xxx\n# Access via process.env.API_KEY in Server Components/Actions",
     compliance: ["SOC2:CC6.1", "PCI-DSS:Req2.3"],
   },
   {
@@ -73,6 +77,8 @@ export const webSecurityRules: SecurityRule[] = [
     pattern: /(?:meta.*?(?:refresh|og:url)|(?:openGraph|twitter)[\s\S]{0,200}?url)\s*[:=]\s*(?:params|searchParams|query|req\.|request\.)/gi,
     languages: ["javascript", "typescript"],
     fix: "Validate and sanitize URLs used in meta tags. Use allowlists for domains.",
+    fixCode:
+      '// Validate URL before using in meta tags\nconst ALLOWED_HOSTS = ["example.com"];\nconst url = new URL(input, "https://example.com");\nif (!ALLOWED_HOSTS.includes(url.hostname)) url.href = "https://example.com";\n\nexport const metadata = { openGraph: { url: url.href } };',
     compliance: ["SOC2:CC6.6"],
   },
   {
@@ -84,6 +90,8 @@ export const webSecurityRules: SecurityRule[] = [
     pattern: /Disallow:\s*\/(?:admin|dashboard|internal|staging|debug|phpMyAdmin|\.env|backup|api\/internal)/gi,
     languages: ["shell"],
     fix: "Don't rely on robots.txt for security. Use authentication to protect sensitive paths. robots.txt is publicly readable.",
+    fixCode:
+      "# robots.txt — keep it simple, don't list sensitive paths\nUser-agent: *\nDisallow:\n\n# Protect paths with authentication instead\n# middleware.ts → clerkMiddleware() for /admin/*",
     compliance: ["SOC2:CC6.6"],
   },
   {
@@ -109,6 +117,8 @@ export const webSecurityRules: SecurityRule[] = [
     pattern: /(?:github_?token|gh_?token|GITHUB_TOKEN)\s*[:=]\s*["'](?:ghp_|gho_|ghu_|ghs_|ghr_|github_pat_)[A-Za-z0-9_]{10,}["']/gi,
     languages: ["javascript", "typescript", "python", "shell"],
     fix: "Use environment variables for GitHub tokens.",
+    fixCode:
+      "// Use environment variable\nconst token = process.env.GITHUB_TOKEN;\n\n// .env.local\nGITHUB_TOKEN=ghp_your_token_here",
     compliance: ["SOC2:CC6.1"],
   },
 
@@ -122,6 +132,8 @@ export const webSecurityRules: SecurityRule[] = [
     pattern: /["']use client["'][\s\S]{0,500}?(?:CLOUDFLARE_API_TOKEN|CF_API_TOKEN|CLOUDFLARE_API_KEY)/g,
     languages: ["javascript", "typescript"],
     fix: "Use Cloudflare API tokens only in server-side code.",
+    fixCode:
+      "// Server-side only (API route or Server Action)\nconst cf = new Cloudflare({ apiToken: process.env.CLOUDFLARE_API_TOKEN! });",
     compliance: ["SOC2:CC6.1"],
   },
   {
@@ -133,6 +145,8 @@ export const webSecurityRules: SecurityRule[] = [
     pattern: /NEXT_PUBLIC_\w*(?:CLOUDFLARE|CF)\w*(?:API|TOKEN|KEY|SECRET)\s*=/gi,
     languages: ["javascript", "typescript", "shell"],
     fix: "Remove NEXT_PUBLIC_ prefix from Cloudflare credentials.",
+    fixCode:
+      "# .env.local — WRONG\n# NEXT_PUBLIC_CF_API_TOKEN=xxx\n\n# CORRECT\nCLOUDFLARE_API_TOKEN=xxx",
     compliance: ["SOC2:CC6.1"],
   },
 
@@ -158,6 +172,8 @@ export const webSecurityRules: SecurityRule[] = [
     pattern: /NEXT_PUBLIC_\w*(?:OPENAI|ANTHROPIC|GOOGLE_AI|GEMINI|COHERE|REPLICATE)\w*(?:KEY|TOKEN|SECRET)\s*=/gi,
     languages: ["javascript", "typescript", "shell"],
     fix: "Remove NEXT_PUBLIC_ prefix from AI API keys. Route AI requests through server-side API routes.",
+    fixCode:
+      "# .env.local — WRONG\n# NEXT_PUBLIC_OPENAI_API_KEY=sk-xxx\n\n# CORRECT — server-side only\nOPENAI_API_KEY=sk-xxx\n# Use in API route: const openai = new OpenAI();",
     compliance: ["SOC2:CC6.1"],
   },
   {

@@ -61,6 +61,8 @@ export const serviceRules: SecurityRule[] = [
     pattern: /(?:redis|Redis|upstash)[\s\S]{0,100}?(?:url|token)\s*[:=]\s*["'](?:https?:\/\/|redis:\/\/|rediss:\/\/)[^"']{10,}["']/gi,
     languages: ["javascript", "typescript"],
     fix: "Use environment variables for Redis connection details.",
+    fixCode:
+      '// Use environment variables\nimport { Redis } from "@upstash/redis";\nconst redis = new Redis({\n  url: process.env.UPSTASH_REDIS_REST_URL!,\n  token: process.env.UPSTASH_REDIS_REST_TOKEN!,\n});',
     compliance: ["SOC2:CC6.1"],
   },
   {
@@ -72,6 +74,8 @@ export const serviceRules: SecurityRule[] = [
     pattern: /NEXT_PUBLIC_\w*(?:REDIS|UPSTASH|KV)\w*(?:URL|TOKEN|SECRET)\s*=/gi,
     languages: ["javascript", "typescript", "shell"],
     fix: "Remove NEXT_PUBLIC_ prefix from Redis credentials. Access them only server-side.",
+    fixCode:
+      "# .env.local — WRONG\n# NEXT_PUBLIC_UPSTASH_REDIS_REST_URL=https://...\n\n# CORRECT — server-side only\nUPSTASH_REDIS_REST_URL=https://...\nUPSTASH_REDIS_REST_TOKEN=...",
     compliance: ["SOC2:CC6.1"],
   },
 
@@ -85,6 +89,8 @@ export const serviceRules: SecurityRule[] = [
     pattern: /["']use client["'][\s\S]{0,500}?PINECONE_API_KEY/g,
     languages: ["javascript", "typescript"],
     fix: "Use Pinecone API key only in server-side code.",
+    fixCode:
+      '// Server-side only\nimport { Pinecone } from "@pinecone-database/pinecone";\nconst pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY! });',
     compliance: ["SOC2:CC6.1"],
   },
   {
@@ -96,6 +102,8 @@ export const serviceRules: SecurityRule[] = [
     pattern: /NEXT_PUBLIC_\w*PINECONE\w*(?:KEY|SECRET|TOKEN)\s*=/gi,
     languages: ["javascript", "typescript", "shell"],
     fix: "Remove NEXT_PUBLIC_ prefix. Pinecone keys must be server-side only.",
+    fixCode:
+      "# .env.local — WRONG\n# NEXT_PUBLIC_PINECONE_API_KEY=pc-xxx\n\n# CORRECT\nPINECONE_API_KEY=pc-xxx",
     compliance: ["SOC2:CC6.1"],
   },
 
@@ -135,6 +143,8 @@ export const serviceRules: SecurityRule[] = [
     pattern: /(?:gtag|ga|dataLayer\.push)\s*\([\s\S]{0,300}?(?:email|user_email|phone|ssn|password)/gi,
     languages: ["javascript", "typescript"],
     fix: "Never send PII to Google Analytics. Use anonymous IDs.",
+    fixCode:
+      "// Use anonymous IDs, never PII\ngtag('event', 'purchase', {\n  user_id: hashedUserId,  // hashed, not email\n  value: 29.99,\n  currency: 'USD',\n});",
     compliance: ["SOC2:CC6.1"],
   },
 ];

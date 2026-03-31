@@ -145,6 +145,8 @@ export const apiSecurityRules: SecurityRule[] = [
       /(?:deleteAccount|deleteUser|cancelSubscription|transferFunds|refund|terminat)\w*\s*(?:=\s*async|\([\s\S]*?\)\s*(?:=>|{))(?:(?!confirm|verify|reauthenticate|twoFactor|2fa|otp|challenge)[\s\S]){10,}?(?:delete|destroy|remove|cancel)\s*\(/gi,
     languages: ["javascript", "typescript"],
     fix: "Add a confirmation step or re-authentication before destructive operations.",
+    fixCode:
+      '"use server";\nexport async function deleteAccount(confirmToken: string) {\n  // Verify confirmation token (sent via email/SMS)\n  const valid = await verifyConfirmationToken(confirmToken);\n  if (!valid) throw new Error("Invalid confirmation");\n  // Re-authenticate\n  const { userId } = await auth();\n  if (!userId) throw new Error("Unauthorized");\n  await db.user.delete({ where: { id: userId } });\n}',
     compliance: ["SOC2:CC6.6"],
   },
 

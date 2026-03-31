@@ -28,6 +28,8 @@ export const deploymentRules: SecurityRule[] = [
       /["']rewrites["']\s*:\s*\[[\s\S]*?["']destination["']\s*:\s*["']https?:\/\/(?:localhost|127\.0\.0\.1|10\.|172\.(?:1[6-9]|2\d|3[01])\.|192\.168\.)/g,
     languages: ["vercel-config", "json"],
     fix: "Do not rewrite to internal network addresses. Use Vercel environment variables for service URLs.",
+    fixCode:
+      '// Use environment variable for backend URL\n{\n  "rewrites": [{\n    "source": "/api/:path*",\n    "destination": "https://api.yourdomain.com/:path*"\n  }]\n}',
     compliance: ["SOC2:CC6.6"],
   },
   {
@@ -55,6 +57,8 @@ export const deploymentRules: SecurityRule[] = [
     pattern: /["']maxDuration["']\s*:\s*(?:[3-9]\d{2}|[1-9]\d{3,})/g,
     languages: ["vercel-config", "json"],
     fix: "Set maxDuration to the minimum required. Default 300s is sufficient for most use cases.",
+    fixCode:
+      '// Set reasonable maxDuration\nexport const maxDuration = 60; // seconds — adjust to actual need',
   },
   {
     id: "VG506",
@@ -67,6 +71,8 @@ export const deploymentRules: SecurityRule[] = [
       /["'](?:SECRET|KEY|TOKEN|PASSWORD|CREDENTIAL)\w*["']\s*:\s*["'][A-Za-z0-9_\-]{12,}["']/gi,
     languages: ["vercel-config", "json"],
     fix: "Use Vercel environment variables (vercel env add) instead of hardcoding in config files.",
+    fixCode:
+      '# Store secrets as Vercel env vars\nvercel env add SECRET_KEY production\n\n# Reference in code\nconst key = process.env.SECRET_KEY;',
     compliance: ["SOC2:CC6.1", "PCI-DSS:Req2.3"],
   },
 
@@ -108,6 +114,8 @@ export const deploymentRules: SecurityRule[] = [
       /headers\s*\(\s*\)\s*\{[\s\S]*?Access-Control-Allow-Origin[\s\S]*?["']\*["']/g,
     languages: ["nextjs-config", "javascript", "typescript"],
     fix: "Restrict CORS to specific trusted origins.",
+    fixCode:
+      '// Restrict to specific origins\nheaders: [\n  { key: "Access-Control-Allow-Origin", value: "https://yourdomain.com" }\n]',
     compliance: ["SOC2:CC6.6"],
   },
   {
@@ -210,6 +218,8 @@ export const deploymentRules: SecurityRule[] = [
     pattern: /internal_port\s*=\s*(?:5432|3306|6379|27017|9200|2379)/g,
     languages: ["fly-config", "toml"],
     fix: "Don't expose database or cache ports publicly. Use internal networking.",
+    fixCode:
+      '# fly.toml — only expose your app port\n[[services]]\n  internal_port = 3000  # app port only\n\n# Access database via internal Fly DNS\n# DATABASE_URL=postgres://db.internal:5432/mydb',
     compliance: ["SOC2:CC6.6"],
   },
   {
@@ -222,6 +232,8 @@ export const deploymentRules: SecurityRule[] = [
     pattern: /force_https\s*=\s*false/g,
     languages: ["fly-config", "toml"],
     fix: "Enable force_https to redirect all HTTP traffic to HTTPS.",
+    fixCode:
+      '# fly.toml\n[[services]]\n  [services.concurrency]\n    hard_limit = 25\n  [[services.ports]]\n    force_https = true\n    port = 80',
     compliance: ["SOC2:CC6.1", "PCI-DSS:Req4.1"],
   },
 ];

@@ -85,6 +85,8 @@ export const paymentRules: SecurityRule[] = [
       /["']use client["'][\s\S]{0,500}?(?:LEMONSQUEEZY_API_KEY|LEMON_SQUEEZY_API_KEY)/g,
     languages: ["javascript", "typescript"],
     fix: "Use LemonSqueezy API key only in server-side code.",
+    fixCode:
+      '// Server-side only (API route)\nimport { lemonSqueezySetup } from "@lemonsqueezy/lemonsqueezy.js";\nlemonSqueezySetup({ apiKey: process.env.LEMONSQUEEZY_API_KEY! });',
     compliance: ["SOC2:CC6.1"],
   },
   {
@@ -114,6 +116,8 @@ export const paymentRules: SecurityRule[] = [
       /["']use client["'][\s\S]{0,500}?(?:POLAR_ACCESS_TOKEN|POLAR_API_KEY|polar.*(?:access_token|api_key))/gi,
     languages: ["javascript", "typescript"],
     fix: "Use Polar API keys only in server-side code.",
+    fixCode:
+      '// Server-side only\nimport { Polar } from "@polar-sh/sdk";\nconst polar = new Polar({ accessToken: process.env.POLAR_ACCESS_TOKEN! });',
     compliance: ["SOC2:CC6.1"],
   },
   {
@@ -127,6 +131,8 @@ export const paymentRules: SecurityRule[] = [
       /(?:\/api\/webhook|\/api\/payment|\/api\/checkout)[\s\S]*?export\s+(?:async\s+)?function\s+POST\s*\([^)]*\)\s*\{(?:(?!verify|signature|constructEvent|hmac|crypto\.createHmac|webhookSecret)[\s\S])*?\}/g,
     languages: ["javascript", "typescript"],
     fix: "Always verify webhook signatures before processing payment events.",
+    fixCode:
+      "// Verify webhook signature\nimport crypto from 'crypto';\nconst sig = request.headers.get('x-webhook-signature');\nconst expected = crypto.createHmac('sha256', process.env.WEBHOOK_SECRET!)\n  .update(body).digest('hex');\nif (sig !== expected) return new Response('Unauthorized', { status: 401 });",
     compliance: ["SOC2:CC6.6", "PCI-DSS:Req6.5.10"],
   },
 ];
