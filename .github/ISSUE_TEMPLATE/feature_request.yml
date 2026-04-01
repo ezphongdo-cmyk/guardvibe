@@ -1,0 +1,28 @@
+name: Feature Request
+description: Suggest a new rule, tool, or improvement
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What would you like to see?
+    validations:
+      required: true
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - New security rule
+        - New MCP tool
+        - Framework support
+        - CLI improvement
+        - Documentation
+        - Performance
+        - Other
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Any references, CVEs, or examples?

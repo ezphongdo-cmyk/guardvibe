@@ -1,0 +1,24 @@
+name: False Positive Report
+description: Report a rule that triggers on safe code
+labels: ["false-positive"]
+body:
+  - type: input
+    id: rule-id
+    attributes:
+      label: Rule ID
+      placeholder: "VG001"
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Code that triggers the false positive
+      render: typescript
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Why this code is safe
+    validations:
+      required: true

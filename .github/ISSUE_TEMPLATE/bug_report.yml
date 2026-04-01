@@ -1,0 +1,42 @@
+name: Bug Report
+description: Report a bug in GuardVibe
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: GuardVibe version
+      placeholder: "1.8.0"
+    validations:
+      required: true
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js version
+      placeholder: "22.0.0"
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - Claude Code
+        - Cursor
+        - Gemini CLI
+        - Codex
+        - Windsurf
+        - CLI (npx guardvibe-scan)
+        - Other
