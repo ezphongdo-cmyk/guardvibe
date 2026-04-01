@@ -11,6 +11,7 @@ export const dockerfileRules: SecurityRule[] = [
     languages: ["dockerfile"],
     fix: "Add a USER instruction after installing dependencies: USER node (or appropriate non-root user).",
     fixCode: "FROM node:20-alpine\nRUN addgroup -S app && adduser -S app -G app\n# ... install dependencies ...\nUSER app\nCMD [\"node\", \"server.js\"]",
+    compliance: ["SOC2:CC6.1"],
   },
   {
     id: "VG201",
@@ -22,6 +23,7 @@ export const dockerfileRules: SecurityRule[] = [
     languages: ["dockerfile"],
     fix: "Copy only dependency files first (package.json, requirements.txt), then install, then copy source.",
     fixCode: "# Copy dependency files first\nCOPY package.json package-lock.json ./\nRUN npm ci --production\n# Then copy source\nCOPY . .",
+    compliance: ["SOC2:CC6.1"],
   },
   {
     id: "VG202",
@@ -33,6 +35,7 @@ export const dockerfileRules: SecurityRule[] = [
     languages: ["dockerfile"],
     fix: "Pin to a specific version tag: FROM node:20-alpine instead of FROM node:latest.",
     fixCode: "# Pin to specific version\nFROM node:20-alpine\n# Not: FROM node:latest\n# Not: FROM node",
+    compliance: ["SOC2:CC7.1"],
   },
   {
     id: "VG203",
@@ -44,6 +47,7 @@ export const dockerfileRules: SecurityRule[] = [
     languages: ["dockerfile"],
     fix: "Use runtime environment variables or Docker secrets instead of baking secrets into the image.",
     fixCode: "# Don't bake secrets in image\n# Instead, pass at runtime:\n# docker run -e SECRET_KEY=xxx myapp\n# Or use Docker secrets / .env file",
+    compliance: ["SOC2:CC6.1", "PCI-DSS:Req2.3"],
   },
   {
     id: "VG204",
@@ -55,6 +59,7 @@ export const dockerfileRules: SecurityRule[] = [
     languages: ["dockerfile"],
     fix: "Use COPY instead of ADD for local files. Only use ADD for URLs or tar extraction.",
     fixCode: "# Use COPY for local files\nCOPY ./src /app/src\n# Only use ADD for remote files or tar extraction\n# ADD https://example.com/file.tar.gz /app/",
+    compliance: ["SOC2:CC6.1"],
   },
   {
     id: "VG205",

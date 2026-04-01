@@ -59,6 +59,7 @@ export const deploymentRules: SecurityRule[] = [
     fix: "Set maxDuration to the minimum required. Default 300s is sufficient for most use cases.",
     fixCode:
       '// Set reasonable maxDuration\nexport const maxDuration = 60; // seconds — adjust to actual need',
+    compliance: ["SOC2:CC6.1"],
   },
   {
     id: "VG506",
@@ -102,6 +103,7 @@ export const deploymentRules: SecurityRule[] = [
     languages: ["nextjs-config", "javascript", "typescript"],
     fix: "Set poweredByHeader to false in next.config.ts.",
     fixCode: "// next.config.ts\nconst config = {\n  poweredByHeader: false,\n};",
+    compliance: ["SOC2:CC6.1"],
   },
   {
     id: "VG510",

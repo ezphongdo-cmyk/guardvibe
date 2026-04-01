@@ -151,6 +151,7 @@ export const coreRules: SecurityRule[] = [
     languages: ["json"],
     fix: "Pin dependencies to specific versions or use caret ranges (^1.2.3). Run npm audit regularly.",
     fixCode: "// Pin to specific version\n\"lodash\": \"^4.17.21\"\n// Run: npm audit to check for vulnerabilities",
+    compliance: ["SOC2:CC7.1"],
   },
   {
     id: "VG030",
@@ -164,6 +165,7 @@ export const coreRules: SecurityRule[] = [
     languages: ["javascript", "typescript", "python", "go"],
     fix: "Add rate limiting middleware. Express: npm install express-rate-limit. FastAPI: use slowapi. Apply stricter limits on auth endpoints (e.g. 5 requests/minute).",
     fixCode: "// Express rate limiting\nimport rateLimit from 'express-rate-limit';\napp.use('/api/', rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));",
+    compliance: ["SOC2:CC7.1"],
   },
   {
     id: "VG040",
@@ -190,6 +192,7 @@ export const coreRules: SecurityRule[] = [
     languages: ["javascript", "typescript", "python"],
     fix: "Disable debug mode in production. Never expose stack traces to users.",
     fixCode: "// Use environment-based config\nconst DEBUG = process.env.NODE_ENV !== 'production';",
+    compliance: ["SOC2:CC6.1"],
   },
   {
     id: "VG042",
@@ -201,6 +204,7 @@ export const coreRules: SecurityRule[] = [
     languages: ["javascript", "typescript"],
     fix: "Use helmet middleware: npm install helmet, then app.use(helmet()).",
     fixCode: "// Add helmet for security headers\nimport helmet from 'helmet';\napp.use(helmet());",
+    compliance: ["SOC2:CC6.1"],
   },
   {
     id: "VG060",
@@ -231,7 +235,7 @@ export const coreRules: SecurityRule[] = [
   {
     id: "VG062",
     name: "Hardcoded secret in variable",
-    severity: "high",
+    severity: "critical",
     owasp: "A07:2025 Auth Failures",
     description:
       "Variable named secret, password, or apiKey assigned a string literal. Secrets should come from environment variables or a secrets manager, never hardcoded in source.",

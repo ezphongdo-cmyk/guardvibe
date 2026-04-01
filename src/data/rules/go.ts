@@ -13,6 +13,7 @@ export const goRules: SecurityRule[] = [
     languages: ["go"],
     fix: "Use parameterized queries: db.Query('SELECT * FROM users WHERE id = $1', id). Never use fmt.Sprintf for SQL.",
     fixCode: "// Use parameterized queries\nrows, err := db.Query(\"SELECT * FROM users WHERE id = $1\", id)",
+    compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.1"],
   },
   {
     id: "VG111",
@@ -25,6 +26,7 @@ export const goRules: SecurityRule[] = [
     languages: ["go"],
     fix: "Validate and sanitize all input before passing to exec.Command. Use an allowlist of permitted commands.",
     fixCode: "// Validate input, use allowlist\ncmd := exec.Command(\"ls\", \"-la\", safeDir)",
+    compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.1"],
   },
   {
     id: "VG112",
@@ -37,6 +39,7 @@ export const goRules: SecurityRule[] = [
     languages: ["go"],
     fix: "Avoid template.HTML() with user input. Use html/template which auto-escapes by default.",
     fixCode: "// Use html/template which auto-escapes\n// Avoid template.HTML() with user input\ntmpl.Execute(w, data) // auto-escaped",
+    compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.7"],
   },
   {
     id: "VG113",
@@ -49,6 +52,7 @@ export const goRules: SecurityRule[] = [
     languages: ["go"],
     fix: "Wrap handlers with authentication middleware: http.Handle('/api/', authMiddleware(handler)).",
     fixCode: "// Wrap with auth middleware\nhttp.Handle(\"/api/\", authMiddleware(apiHandler))",
+    compliance: ["SOC2:CC6.1", "SOC2:CC6.6"],
   },
   {
     id: "VG114",
@@ -61,6 +65,7 @@ export const goRules: SecurityRule[] = [
     languages: ["go"],
     fix: "Use crypto/sha256 or golang.org/x/crypto/bcrypt for password hashing.",
     fixCode: "// Use bcrypt for passwords\nimport \"golang.org/x/crypto/bcrypt\"\nhash, _ := bcrypt.GenerateFromPassword([]byte(password), 12)",
+    compliance: ["SOC2:CC6.1", "PCI-DSS:Req4.1"],
   },
   {
     id: "VG115",
@@ -73,5 +78,6 @@ export const goRules: SecurityRule[] = [
     languages: ["go"],
     fix: "Set specific allowed origins instead of wildcard '*'.",
     fixCode: "// Specify allowed origins\nw.Header().Set(\"Access-Control-Allow-Origin\", \"https://myapp.com\")",
+    compliance: ["SOC2:CC6.1"],
   },
 ];

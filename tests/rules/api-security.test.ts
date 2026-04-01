@@ -22,6 +22,12 @@ describe("OWASP API Security Rules", () => {
         "VG950"
       ));
     });
+    it("detects findOne with input.id", () => {
+      assert(hasRule(
+        `const item = await collection.findOne({ id: input.id });`,
+        "VG950"
+      ));
+    });
   });
 
   describe("VG951 - BOLA: Delete/Update Without Ownership", () => {
@@ -31,10 +37,32 @@ describe("OWASP API Security Rules", () => {
         "VG951"
       ));
     });
+    it("detects update with input.id only", () => {
+      assert(hasRule(
+        `await prisma.post.update({ where: { id: input.id }, data: { title: "new" } });`,
+        "VG951"
+      ));
+    });
     it("allows delete with userId in where clause", () => {
       assert(!hasRule(
         `await prisma.post.delete({ where: { id: req.params.id, userId } });`,
         "VG951"
+      ));
+    });
+  });
+
+  // API2 — Broken Authentication
+  describe("VG952 - API Route Without Authentication", () => {
+    it("detects route handler with db access but no auth", () => {
+      assert(hasRule(
+        `export async function GET(req) {\n  const items = await prisma.item.findMany();\n  return Response.json(items);\n}`,
+        "VG952"
+      ));
+    });
+    it("allows route handler with auth check", () => {
+      assert(!hasRule(
+        `export async function GET(req) {\n  const { userId } = await auth();\n  const items = await prisma.item.findMany();\n}`,
+        "VG952"
       ));
     });
   });
@@ -68,6 +96,12 @@ describe("OWASP API Security Rules", () => {
         "VG954"
       ));
     });
+    it("ignores Object.assign with safe data", () => {
+      assert(!hasRule(
+        `Object.assign(user, { name: "test" });`,
+        "VG954"
+      ));
+    });
   });
 
   // API4 — Resource Consumption
@@ -86,6 +120,53 @@ describe("OWASP API Security Rules", () => {
     });
   });
 
+  describe("VG956 - Missing Rate Limiting on API Route", () => {
+    it("detects POST handler with create but no rate limit", () => {
+      assert(hasRule(
+        `export async function POST(req) {\n  const body = await req.json();\n  const item = await prisma.item.create({ data: body });\n  return Response.json(item);\n}`,
+        "VG956"
+      ));
+    });
+    it("allows POST handler with rateLimit", () => {
+      assert(!hasRule(
+        `export async function POST(req) {\n  const { success } = await rateLimit.limit(ip);\n  const item = await prisma.item.create({ data: body });\n}`,
+        "VG956"
+      ));
+    });
+  });
+
+  // API5 — Broken Function Level Authorization
+  describe("VG957 - Admin Endpoint Without Role Verification", () => {
+    it("detects admin endpoint without role check", () => {
+      assert(hasRule(
+        `/api/admin/users\nexport async function GET(req) {\n  const users = await prisma.user.findMany();\n  return Response.json(users);\n}`,
+        "VG957"
+      ));
+    });
+    it("allows admin endpoint with role check", () => {
+      assert(!hasRule(
+        `/api/admin/users\nexport async function GET(req) {\n  if (orgRole !== "org:admin") return;\n  const users = await prisma.user.findMany();\n}`,
+        "VG957"
+      ));
+    });
+  });
+
+  // API6 — Unrestricted Access to Sensitive Business Flows
+  describe("VG958 - Sensitive Business Op Without Confirmation", () => {
+    it("detects deleteAccount without confirmation step", () => {
+      assert(hasRule(
+        `async function deleteAccount(userId) {\n  const user = await db.user.findFirst({ where: { id: userId } });\n  await db.user.delete({ where: { id: userId } });\n}`,
+        "VG958"
+      ));
+    });
+    it("allows deleteAccount with confirm step", () => {
+      assert(!hasRule(
+        `async function deleteAccount(token) {\n  const valid = await verifyConfirmationToken(token);\n  await db.user.delete({ where: { id } });\n}`,
+        "VG958"
+      ));
+    });
+  });
+
   // API8 — Security Misconfiguration
   describe("VG959 - Verbose Error Leaks", () => {
     it("detects error.message in response", () => {
@@ -97,6 +178,12 @@ describe("OWASP API Security Rules", () => {
     it("detects error.stack in response", () => {
       assert(hasRule(
         `catch (err) { res.json({ error: err.stack }); }`,
+        "VG959"
+      ));
+    });
+    it("allows generic error response", () => {
+      assert(!hasRule(
+        `catch (error) { return Response.json({ error: "Something went wrong" }, { status: 500 }); }`,
         "VG959"
       ));
     });

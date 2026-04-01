@@ -11,6 +11,7 @@ export const cicdRules: SecurityRule[] = [
     languages: ["yaml"],
     fix: "Pass secrets as environment variables instead of interpolating in run steps.",
     fixCode: "# Pass secrets via env, not interpolation\nsteps:\n  - run: echo \"deploying\"\n    env:\n      MY_SECRET: ${{ secrets.MY_SECRET }}",
+    compliance: ["SOC2:CC6.1", "PCI-DSS:Req2.3"],
   },
   {
     id: "VG211",
@@ -22,6 +23,7 @@ export const cicdRules: SecurityRule[] = [
     languages: ["yaml"],
     fix: "Use pull_request trigger instead, or avoid checking out PR code with pull_request_target.",
     fixCode: "# Use pull_request instead of pull_request_target\non:\n  pull_request:\n    branches: [main]",
+    compliance: ["SOC2:CC6.1", "SOC2:CC6.6"],
   },
   {
     id: "VG212",
@@ -33,6 +35,7 @@ export const cicdRules: SecurityRule[] = [
     languages: ["yaml"],
     fix: "Pin actions to a specific commit SHA or version tag.",
     fixCode: "# Pin to specific version or SHA\nuses: actions/checkout@v4\n# Or pin to commit SHA:\n# uses: actions/checkout@abc123def456",
+    compliance: ["SOC2:CC7.1"],
   },
   {
     id: "VG213",
@@ -44,6 +47,7 @@ export const cicdRules: SecurityRule[] = [
     languages: ["yaml"],
     fix: "Specify minimum required permissions for each job.",
     fixCode: "# Use least-privilege permissions\npermissions:\n  contents: read\n  pull-requests: write",
+    compliance: ["SOC2:CC6.1", "PCI-DSS:Req8"],
   },
   {
     id: "VG214",

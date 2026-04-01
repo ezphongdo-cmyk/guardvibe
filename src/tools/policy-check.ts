@@ -1,28 +1,10 @@
-import { readdirSync, readFileSync, statSync } from "fs";
-import { join, extname, basename, resolve } from "path";
+import { readFileSync, statSync } from "fs";
+import { extname, basename, resolve } from "path";
 import { analyzeCode, type Finding } from "./check-code.js";
 import { loadConfig, type CompliancePolicy, type PolicyException } from "../utils/config.js";
 import type { SecurityRule } from "../data/rules/types.js";
-
-const EXTENSION_MAP: Record<string, string> = {
-  ".js": "javascript", ".jsx": "javascript", ".mjs": "javascript", ".cjs": "javascript",
-  ".ts": "typescript", ".tsx": "typescript", ".mts": "typescript", ".cts": "typescript",
-  ".py": "python", ".go": "go", ".html": "html",
-  ".sql": "sql", ".sh": "shell", ".bash": "shell",
-  ".yml": "yaml", ".yaml": "yaml", ".tf": "terraform",
-  ".toml": "toml", ".json": "json",
-};
-
-const CONFIG_FILE_MAP: Record<string, string> = {
-  "vercel.json": "vercel-config",
-  "next.config.js": "nextjs-config", "next.config.mjs": "nextjs-config", "next.config.ts": "nextjs-config",
-  "docker-compose.yml": "docker-compose", "docker-compose.yaml": "docker-compose",
-};
-
-const DEFAULT_EXCLUDES = new Set([
-  "node_modules", ".git", "build", "dist", "vendor", "__pycache__",
-  ".next", ".nuxt", "coverage", ".turbo",
-]);
+import { EXTENSION_MAP, CONFIG_FILE_MAP, DEFAULT_EXCLUDES } from "../utils/constants.js";
+import { walkDirectory } from "../utils/walk-directory.js";
 
 interface PolicyFinding {
   rule: SecurityRule;
@@ -46,22 +28,6 @@ interface PolicyResult {
     failOn: string;
     requiredControlsStatus: Record<string, "pass" | "fail">;
   };
-}
-
-function walkDir(dir: string, excludes: Set<string>, results: string[]): void {
-  let entries;
-  try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
-  for (const entry of entries) {
-    if (excludes.has(entry.name)) continue;
-    const fullPath = join(dir, entry.name);
-    if (entry.isDirectory()) walkDir(fullPath, excludes, results);
-    else if (entry.isFile()) {
-      const ext = extname(entry.name).toLowerCase();
-      if (EXTENSION_MAP[ext] || entry.name.startsWith("Dockerfile") || CONFIG_FILE_MAP[entry.name]) {
-        results.push(fullPath);
-      }
-    }
-  }
 }
 
 function isExcepted(ruleId: string, filePath: string, exceptions: PolicyException[]): PolicyException | null {
@@ -116,7 +82,7 @@ export function policyCheck(
 
   const excludes = new Set([...DEFAULT_EXCLUDES, ...config.scan.exclude]);
   const filePaths: string[] = [];
-  walkDir(scanRoot, excludes, filePaths);
+  walkDirectory(scanRoot, true, excludes, filePaths);
 
   const policyFindings: PolicyFinding[] = [];
   const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };

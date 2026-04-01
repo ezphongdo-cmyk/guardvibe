@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 
+import { createRequire } from "module";
 import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync, unlinkSync } from "fs";
 import { join, dirname } from "path";
 import { homedir } from "os";
+
+const require = createRequire(import.meta.url);
+const pkg = require("../package.json") as { version: string };
 
 const GUARDVIBE_MCP_CONFIG = {
   command: "npx",
@@ -351,23 +355,33 @@ function printUsage(): void {
   console.log(`
   GuardVibe Security - CLI
 
-  Usage:
+  Commands:
     npx guardvibe scan [path]        Scan a directory for security issues
-    npx guardvibe check <file>       Scan a single file
-    npx guardvibe init <platform>    Setup MCP server
-    npx guardvibe hook install       Install pre-commit hook
-    npx guardvibe hook uninstall     Remove pre-commit hook
+    npx guardvibe check <file>       Scan a single file for security issues
+    npx guardvibe init <platform>    Setup MCP server configuration
+    npx guardvibe hook install       Install pre-commit security hook
+    npx guardvibe hook uninstall     Remove pre-commit security hook
     npx guardvibe ci github          Generate GitHub Actions workflow
+
+  Scan CLI (used by pre-commit hook and CI):
+    npx guardvibe-scan               Scan git-staged files
+    npx guardvibe-scan --format sarif --output results.sarif
 
   Options:
     --format <type>   Output format: markdown (default), json, sarif
     --output <file>   Write results to file instead of stdout
+    --version, -V     Print version and exit
+    --help, -h        Show this help message
 
   MCP Platforms:
-    claude    Claude Code (.claude.json)
+    claude    Claude Code (.claude.json in project root)
     gemini    Gemini CLI (~/.gemini/settings.json)
     cursor    Cursor (.cursor/mcp.json)
-    all       All platforms
+    all       All platforms at once
+
+  Supported File Types:
+    .js .jsx .mjs .cjs .ts .tsx .mts .cts .py .go .html .sql
+    .sh .bash .yml .yaml .tf .toml .json Dockerfile
 
   Examples:
     npx guardvibe scan .
@@ -383,6 +397,11 @@ function printUsage(): void {
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
+
+  if (args.includes("--version") || args.includes("-V")) {
+    console.log(pkg.version);
+    process.exit(0);
+  }
 
   if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
     printUsage();

@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 
+import { createRequire } from "module";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { checkCode } from "./tools/check-code.js";
+
+const require = createRequire(import.meta.url);
+const pkg = require("../package.json") as { version: string };
 import { checkProject } from "./tools/check-project.js";
 import { getSecurityDocs } from "./tools/get-security-docs.js";
 import { checkDependencies } from "./tools/check-deps.js";
@@ -29,10 +33,11 @@ import { discoverPlugins } from "./plugins/loader.js";
 import { builtinRules } from "./data/rules/index.js";
 import type { SecurityRule } from "./data/rules/types.js";
 import { loadConfig } from "./utils/config.js";
+import { setRules, getRules } from "./utils/rule-registry.js";
 
 const server = new McpServer({
   name: "guardvibe",
-  version: "1.6.0",
+  version: pkg.version,
 });
 
 // Tool 1: Analyze code for security vulnerabilities
@@ -51,7 +56,7 @@ server.tool(
     format: z.enum(["markdown", "json"]).default("markdown").describe("Output format: markdown (human) or json (machine-readable for agents)"),
   },
   async ({ code, language, framework, format }) => {
-    const rules = (globalThis as any).__guardvibe_rules as SecurityRule[] | undefined;
+    const rules = getRules();
     const results = checkCode(code, language, framework, undefined, undefined, format, rules);
     return {
       content: [{ type: "text", text: results }],
@@ -75,7 +80,7 @@ server.tool(
     format: z.enum(["markdown", "json"]).default("markdown").describe("Output format: markdown (human) or json (machine-readable for agents)"),
   },
   async ({ files, format }) => {
-    const rules = (globalThis as any).__guardvibe_rules as SecurityRule[] | undefined;
+    const rules = getRules();
     const results = checkProject(files, format, rules);
     return {
       content: [{ type: "text", text: results }],
@@ -150,7 +155,7 @@ server.tool(
     baseline: z.string().optional().describe("Path to a previous scan JSON output file for baseline comparison (new/fixed/unchanged findings)"),
   },
   async ({ path, recursive, exclude, format, baseline }) => {
-    const rules = (globalThis as any).__guardvibe_rules as SecurityRule[] | undefined;
+    const rules = getRules();
     const results = scanDirectory(path, recursive, exclude, format, rules, baseline);
     return { content: [{ type: "text", text: results }] };
   }
@@ -193,7 +198,7 @@ server.tool(
     format: z.enum(["markdown", "json"]).default("markdown").describe("Output format: markdown (human) or json (machine-readable for agents)"),
   },
   async ({ format }) => {
-    const rules = (globalThis as any).__guardvibe_rules as SecurityRule[] | undefined;
+    const rules = getRules();
     const results = scanStaged(process.cwd(), format, rules);
     return { content: [{ type: "text", text: results }] };
   }
@@ -210,7 +215,7 @@ server.tool(
     mode: z.enum(["full", "executive"]).default("full").describe("Report mode: full (detailed) or executive (C-level summary)"),
   },
   async ({ path, framework, format, mode }) => {
-    const rules = (globalThis as any).__guardvibe_rules as SecurityRule[] | undefined;
+    const rules = getRules();
     const results = complianceReport(path, framework, format, rules, mode);
     return { content: [{ type: "text", text: results }] };
   }
@@ -224,7 +229,7 @@ server.tool(
     path: z.string().describe("Directory to scan"),
   },
   async ({ path }) => {
-    const rules = (globalThis as any).__guardvibe_rules as SecurityRule[] | undefined;
+    const rules = getRules();
     const results = exportSarif(path, rules);
     return { content: [{ type: "text", text: results }] };
   }
@@ -260,7 +265,7 @@ server.tool(
     format: z.enum(["markdown", "json"]).default("json").describe("Output format: json (for agent auto-fix) or markdown (human review)"),
   },
   async ({ code, language, framework, format }) => {
-    const rules = (globalThis as any).__guardvibe_rules as SecurityRule[] | undefined;
+    const rules = getRules();
     const results = fixCode(code, language, framework, undefined, format, rules);
     return {
       content: [{ type: "text", text: results }],
@@ -308,7 +313,7 @@ server.tool(
     fail_on: z.enum(["critical", "high", "medium", "low", "none"]).default("high").describe("Block PR if findings at this severity or above exist"),
   },
   async ({ path, base, format, diff_only, fail_on }) => {
-    const rules = (globalThis as any).__guardvibe_rules as SecurityRule[] | undefined;
+    const rules = getRules();
     const results = reviewPr(path, base, format, diff_only, fail_on, rules);
     return { content: [{ type: "text", text: results }] };
   }
@@ -338,7 +343,7 @@ server.tool(
     format: z.enum(["markdown", "json"]).default("markdown").describe("Output format"),
   },
   async ({ path, format }) => {
-    const rules = (globalThis as any).__guardvibe_rules as SecurityRule[] | undefined;
+    const rules = getRules();
     const results = policyCheck(path, format, rules);
     return { content: [{ type: "text", text: results }] };
   }
@@ -420,7 +425,7 @@ server.tool(
     format: z.enum(["markdown", "json"]).default("markdown").describe("Output format"),
   },
   async ({ rule_id, code, format }) => {
-    const rules = (globalThis as any).__guardvibe_rules as SecurityRule[] | undefined;
+    const rules = getRules();
     const results = explainRemediation(rule_id, code, format, rules);
     return { content: [{ type: "text", text: results }] };
   }
@@ -448,14 +453,19 @@ async function main() {
       tool.description,
       tool.schema as any,
       async (input: any) => {
-        const result = await tool.handler(input);
-        return { content: [{ type: "text" as const, text: result }] };
+        try {
+          const result = await tool.handler(input);
+          return { content: [{ type: "text" as const, text: result }] };
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          return { content: [{ type: "text" as const, text: `Plugin error (${tool.name}): ${msg}` }] };
+        }
       }
     );
   }
 
   // Store merged rules for tool handlers
-  (globalThis as any).__guardvibe_rules = allRules;
+  setRules(allRules);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

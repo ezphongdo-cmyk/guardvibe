@@ -1,39 +1,11 @@
-import { readdirSync, readFileSync, statSync } from "fs";
-import { join, extname, basename, resolve } from "path";
+import { readFileSync, statSync } from "fs";
+import { extname, basename, resolve } from "path";
 import { analyzeCode, type Finding } from "./check-code.js";
 import { owaspRules } from "../data/rules/index.js";
 import { loadConfig } from "../utils/config.js";
 import type { SecurityRule } from "../data/rules/types.js";
-
-const EXTENSION_MAP: Record<string, string> = {
-  ".js": "javascript", ".jsx": "javascript", ".mjs": "javascript", ".cjs": "javascript",
-  ".ts": "typescript", ".tsx": "typescript", ".mts": "typescript", ".cts": "typescript",
-  ".py": "python", ".go": "go", ".html": "html",
-  ".sql": "sql", ".sh": "shell", ".bash": "shell",
-  ".yml": "yaml", ".yaml": "yaml", ".tf": "terraform", ".json": "json",
-};
-
-const DEFAULT_EXCLUDES = new Set([
-  "node_modules", ".git", "build", "dist", "vendor", "__pycache__",
-  ".next", ".nuxt", "coverage", ".turbo",
-]);
-
-function walkDir(dir: string, excludes: Set<string>, results: string[]): void {
-  let entries;
-  try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
-  for (const entry of entries) {
-    if (excludes.has(entry.name)) continue;
-    const fullPath = join(dir, entry.name);
-    if (entry.isDirectory()) {
-      walkDir(fullPath, excludes, results);
-    } else if (entry.isFile()) {
-      const ext = extname(entry.name).toLowerCase();
-      if (EXTENSION_MAP[ext] || entry.name.startsWith("Dockerfile")) {
-        results.push(fullPath);
-      }
-    }
-  }
-}
+import { EXTENSION_MAP, DEFAULT_EXCLUDES } from "../utils/constants.js";
+import { walkDirectory } from "../utils/walk-directory.js";
 
 interface SarifResult {
   ruleId: string;
@@ -58,7 +30,7 @@ export function exportSarif(path: string, rules?: SecurityRule[]): string {
   const config = loadConfig(scanRoot);
   const excludes = new Set([...DEFAULT_EXCLUDES, ...config.scan.exclude]);
   const filePaths: string[] = [];
-  walkDir(scanRoot, excludes, filePaths);
+  walkDirectory(scanRoot, true, excludes, filePaths);
 
   const allResults: SarifResult[] = [];
 

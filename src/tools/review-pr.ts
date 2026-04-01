@@ -2,21 +2,7 @@ import { execFileSync } from "child_process";
 import { extname, basename } from "path";
 import { analyzeCode, type Finding } from "./check-code.js";
 import type { SecurityRule } from "../data/rules/types.js";
-
-const EXTENSION_MAP: Record<string, string> = {
-  ".js": "javascript", ".jsx": "javascript", ".mjs": "javascript", ".cjs": "javascript",
-  ".ts": "typescript", ".tsx": "typescript", ".mts": "typescript", ".cts": "typescript",
-  ".py": "python", ".go": "go", ".html": "html",
-  ".sql": "sql", ".sh": "shell", ".bash": "shell",
-  ".yml": "yaml", ".yaml": "yaml", ".tf": "terraform",
-  ".toml": "toml", ".json": "json",
-};
-
-const CONFIG_FILE_MAP: Record<string, string> = {
-  "vercel.json": "vercel-config",
-  "next.config.js": "nextjs-config", "next.config.mjs": "nextjs-config", "next.config.ts": "nextjs-config",
-  "docker-compose.yml": "docker-compose", "docker-compose.yaml": "docker-compose",
-};
+import { EXTENSION_MAP, CONFIG_FILE_MAP } from "../utils/constants.js";
 
 interface DiffHunk {
   startLine: number;

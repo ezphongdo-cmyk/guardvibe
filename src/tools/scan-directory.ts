@@ -1,40 +1,18 @@
-import { readdirSync, readFileSync, statSync, writeFileSync, existsSync } from "fs";
-import { join, extname, basename, resolve } from "path";
+import { createRequire } from "module";
+import { readFileSync, statSync } from "fs";
+import { extname, basename, resolve } from "path";
 import { createHash, randomUUID } from "crypto";
 import { analyzeCode, formatFindingsJson, type Finding } from "./check-code.js";
 import { loadConfig } from "../utils/config.js";
 import type { SecurityRule } from "../data/rules/types.js";
+import { DEFAULT_EXCLUDES, EXTENSION_MAP, CONFIG_FILE_MAP } from "../utils/constants.js";
+import { walkDirectory } from "../utils/walk-directory.js";
 
-const DEFAULT_EXCLUDES = new Set([
-  "node_modules", ".git", "build", "dist", "vendor", "__pycache__",
-  ".next", ".nuxt", ".svelte-kit", "target", "bin", "obj",
-  "coverage", ".turbo", ".venv", "venv",
-]);
-
-const EXTENSION_MAP: Record<string, string> = {
-  ".js": "javascript", ".jsx": "javascript", ".mjs": "javascript", ".cjs": "javascript",
-  ".ts": "typescript", ".tsx": "typescript", ".mts": "typescript", ".cts": "typescript",
-  ".py": "python", ".go": "go", ".html": "html",
-  ".sql": "sql", ".sh": "shell", ".bash": "shell",
-  ".yml": "yaml", ".yaml": "yaml",
-  ".tf": "terraform",
-  ".toml": "toml", ".json": "json",
-};
-
-const CONFIG_FILE_MAP: Record<string, string> = {
-  "vercel.json": "vercel-config",
-  "next.config.js": "nextjs-config",
-  "next.config.mjs": "nextjs-config",
-  "next.config.ts": "nextjs-config",
-  "docker-compose.yml": "docker-compose",
-  "docker-compose.yaml": "docker-compose",
-  "fly.toml": "fly-config",
-  "render.yaml": "render-config",
-  "netlify.toml": "netlify-config",
-};
+const require = createRequire(import.meta.url);
+const pkg = require("../../package.json") as { version: string };
 
 // GuardVibe version — used in scan metadata
-const GUARDVIBE_VERSION = "1.4.0";
+const GUARDVIBE_VERSION = pkg.version;
 
 interface ScanResult {
   path: string;
@@ -72,39 +50,6 @@ interface BaselineDiff {
   unchanged: BaselineEntry[];
 }
 
-function walkDirectory(
-  dir: string,
-  recursive: boolean,
-  excludes: Set<string>,
-  results: string[]
-): void {
-  let entries;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-
-  for (const entry of entries) {
-    if (excludes.has(entry.name)) continue;
-    const fullPath = join(dir, entry.name);
-
-    if (entry.isDirectory() && recursive) {
-      walkDirectory(fullPath, recursive, excludes, results);
-    } else if (entry.isFile()) {
-      const ext = extname(entry.name).toLowerCase();
-      if (EXTENSION_MAP[ext]) {
-        results.push(fullPath);
-      }
-      if (entry.name.startsWith("Dockerfile") || entry.name.endsWith(".dockerfile")) {
-        results.push(fullPath);
-      }
-      if (CONFIG_FILE_MAP[entry.name] && !results.includes(fullPath)) {
-        results.push(fullPath);
-      }
-    }
-  }
-}
 
 function hashContent(content: string): string {
   return createHash("sha256").update(content).digest("hex").substring(0, 16);

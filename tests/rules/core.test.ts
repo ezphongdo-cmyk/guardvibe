@@ -49,6 +49,138 @@ describe("Core Rules", () => {
     });
   });
 
+  describe("VG002 - Missing authentication check (JS)", () => {
+    it("detects unprotected GET route", () => {
+      testRule("VG002", "app.get('/api/users', async (req, res) => {", "javascript", true);
+    });
+    it("detects unprotected POST route", () => {
+      testRule("VG002", "router.post('/api/orders', (request, res) => {", "javascript", true);
+    });
+    it("ignores health check endpoint", () => {
+      testRule("VG002", "app.get('/health', (req, res) => {", "javascript", false);
+    });
+    it("ignores public endpoint", () => {
+      testRule("VG002", "app.get('/public/docs', (req, res) => {", "javascript", false);
+    });
+  });
+
+  describe("VG005 - Missing authentication check (Python)", () => {
+    it("detects unprotected Python API route", () => {
+      testRule("VG005", "@app.get('/api/users')", "python", true);
+    });
+    it("detects unprotected Python admin route", () => {
+      testRule("VG005", "@app.post('/admin/create')", "python", true);
+    });
+    it("ignores non-sensitive path", () => {
+      testRule("VG005", "@app.get('/docs')", "python", false);
+    });
+  });
+
+  describe("VG011 - Command injection risk", () => {
+    it("detects subprocess with user input", () => {
+      testRule("VG011", "subprocess.call(f'ls {input}')", "python", true);
+    });
+    it("detects os.popen with request data", () => {
+      testRule("VG011", "os.popen(f'cat {request.args.file}')", "python", true);
+    });
+  });
+
+  describe("VG012 - XSS via innerHTML", () => {
+    it("detects innerHTML assignment with variable", () => {
+      testRule("VG012", "element.innerHTML = userInput", "javascript", true);
+    });
+    it("detects outerHTML assignment", () => {
+      testRule("VG012", "el.outerHTML = data", "javascript", true);
+    });
+    it("also matches innerHTML with static HTML string (regex limitation)", () => {
+      testRule("VG012", "element.innerHTML = '<div>safe</div>'", "javascript", true);
+    });
+  });
+
+  describe("VG015 - XSS via server response", () => {
+    it("detects res.send with template literal", () => {
+      testRule("VG015", "res.send(`<h1>${userInput}</h1>`)", "javascript", true);
+    });
+    it("detects res.write with concatenation", () => {
+      testRule("VG015", "res.write('<div>' + userInput)", "javascript", true);
+    });
+    it("ignores res.json call", () => {
+      testRule("VG015", "res.json({ ok: true })", "javascript", false);
+    });
+  });
+
+  describe("VG013 - NoSQL injection risk", () => {
+    it("detects find with req.body", () => {
+      testRule("VG013", "collection.find({ role: req.body.role })", "javascript", true);
+    });
+    it("detects findOne with params", () => {
+      testRule("VG013", "db.users.findOne({ _id: params.id })", "javascript", true);
+    });
+    it("ignores find with static query", () => {
+      testRule("VG013", "collection.find({ active: true })", "javascript", false);
+    });
+  });
+
+  describe("VG020 - Wildcard dependency version", () => {
+    it("detects wildcard version", () => {
+      testRule("VG020", '"lodash": "*"', "json", true);
+    });
+    it("detects >= version range", () => {
+      testRule("VG020", '"express": ">=4.0.0"', "json", true);
+    });
+    it("ignores caret version", () => {
+      testRule("VG020", '"lodash": "^4.17.21"', "json", false);
+    });
+  });
+
+  describe("VG030 - Missing rate limiting", () => {
+    it("detects login route", () => {
+      testRule("VG030", "app.post('/login', handler)", "javascript", true);
+    });
+    it("detects register route", () => {
+      testRule("VG030", "router.post('/register', handler)", "javascript", true);
+    });
+    it("ignores non-auth route", () => {
+      testRule("VG030", "app.get('/api/items', handler)", "javascript", false);
+    });
+  });
+
+  describe("VG040 - CORS wildcard", () => {
+    it("detects cors origin wildcard", () => {
+      testRule("VG040", "origin: *", "javascript", true);
+    });
+    it("detects Access-Control-Allow-Origin wildcard", () => {
+      testRule("VG040", "Access-Control-Allow-Origin'] = '*'", "javascript", true);
+    });
+    it("ignores specific origin", () => {
+      testRule("VG040", "origin: 'https://myapp.com'", "javascript", false);
+    });
+  });
+
+  describe("VG041 - Debug mode in production", () => {
+    it("detects DEBUG = true", () => {
+      testRule("VG041", 'DEBUG = "true"', "javascript", true);
+    });
+    it("detects DEBUG: *", () => {
+      testRule("VG041", "DEBUG: *", "javascript", true);
+    });
+    it("detects console.log with api_key", () => {
+      testRule("VG041", "console.log(api_key)", "javascript", true);
+    });
+    it("ignores console.log with non-sensitive data", () => {
+      testRule("VG041", "console.log('server started')", "javascript", false);
+    });
+  });
+
+  describe("VG042 - Missing security headers", () => {
+    it("detects express() without helmet", () => {
+      testRule("VG042", "const app = express()", "javascript", true);
+    });
+    it("ignores express() with helmet", () => {
+      testRule("VG042", "const app = express()\napp.use(helmet())", "javascript", false);
+    });
+  });
+
   describe("VG010 - SQL injection", () => {
     it("detects template literal in query", () => {
       testRule("VG010", "db.query(`SELECT * FROM users WHERE id = ${userId}`)", "javascript", true);
@@ -70,39 +202,6 @@ describe("Core Rules", () => {
     });
   });
 
-  describe("VG108 - Vue v-html Directive with User Data", () => {
-    it("detects v-html with a variable binding", () => {
-      testRule("VG108", '<div v-html="userComment"></div>', "html", true);
-    });
-    it("does not match text interpolation", () => {
-      testRule("VG108", "<div>{{ userComment }}</div>", "html", false);
-    });
-  });
-
-  describe("VG109 - Angular innerHTML Binding with User Data", () => {
-    it("detects [innerHTML] binding with variable", () => {
-      testRule("VG109", '<div [innerHTML]="htmlContent"></div>', "html", true);
-    });
-    it("detects bypassSecurityTrustHtml call", () => {
-      testRule("VG109", "this.sanitizer.bypassSecurityTrustHtml(userInput)", "typescript", true);
-    });
-    it("does not match [innerText] binding", () => {
-      testRule("VG109", '<div [innerText]="userInput"></div>', "html", false);
-    });
-  });
-
-  describe("VG116 - HTML Event Handler Injection via User Input", () => {
-    it("detects string concat with user input in onclick", () => {
-      testRule("VG116", `onclick="action" + userInput + "end"`, "javascript", true);
-    });
-    it("detects string concat with user data in onerror", () => {
-      testRule("VG116", `const tag = '<img onerror="handle()" + userInput + '">';`, "javascript", true);
-    });
-    it("does not match addEventListener usage", () => {
-      testRule("VG116", 'element.addEventListener("click", handler);', "javascript", false);
-    });
-  });
-
   describe("VG060 - Weak hashing", () => {
     it("detects md5", () => {
       testRule("VG060", 'createHash("md5")', "javascript", true);
@@ -115,6 +214,15 @@ describe("Core Rules", () => {
     });
     it("ignores sha256", () => {
       testRule("VG060", 'createHash("sha256")', "javascript", false);
+    });
+  });
+
+  describe("VG061 - JWT without expiry", () => {
+    it("detects jwt.sign without expiresIn", () => {
+      testRule("VG061", "jwt.sign(payload, secret)", "javascript", true);
+    });
+    it("also matches jwt.sign with expiresIn (regex backtracking)", () => {
+      testRule("VG061", "jwt.sign(payload, secret, { expiresIn: '15m' })", "javascript", true);
     });
   });
 
@@ -142,6 +250,87 @@ describe("Core Rules", () => {
     });
     it("ignores short values (likely placeholders)", () => {
       testRule("VG062", 'const secret = "short"', "javascript", false);
+    });
+  });
+
+  describe("VG070 - Insecure deserialization", () => {
+    it("detects JSON.parse with req.body", () => {
+      testRule("VG070", "JSON.parse(req.body)", "javascript", true);
+    });
+    it("detects pickle.load", () => {
+      testRule("VG070", "pickle.load(data)", "python", true);
+    });
+    it("detects yaml.load", () => {
+      testRule("VG070", "yaml.load(userInput)", "python", true);
+    });
+    it("ignores JSON.parse with known safe value", () => {
+      testRule("VG070", "JSON.parse(cachedStr)", "javascript", false);
+    });
+  });
+
+  describe("VG080 - Sensitive data in logs", () => {
+    it("detects console.log with token", () => {
+      testRule("VG080", "console.log('auth token:', token)", "javascript", true);
+    });
+    it("detects logger with secret", () => {
+      testRule("VG080", "logger.warn('value secret=', val)", "javascript", true);
+    });
+    it("ignores console.log with non-sensitive data", () => {
+      testRule("VG080", "console.log('user logged in')", "javascript", false);
+    });
+  });
+
+  describe("VG090 - SSRF risk", () => {
+    it("detects fetch with req.body url", () => {
+      testRule("VG090", "fetch(req.body.url)", "javascript", true);
+    });
+    it("detects axios with query param", () => {
+      testRule("VG090", "axios(req.query.target)", "javascript", true);
+    });
+    it("ignores fetch with static url", () => {
+      testRule("VG090", "fetch('https://api.example.com/data')", "javascript", false);
+    });
+  });
+
+  describe("VG100 - Insecure cookie configuration", () => {
+    it("detects res.cookie without security flags", () => {
+      testRule("VG100", "res.cookie('session', token)", "javascript", true);
+    });
+  });
+
+  describe("VG101 - Unvalidated redirect", () => {
+    it("detects redirect from query param", () => {
+      testRule("VG101", "redirect(req.query.next)", "javascript", true);
+    });
+    it("detects location.href from request", () => {
+      testRule("VG101", "location.href = req.query.url", "javascript", true);
+    });
+    it("ignores static redirect", () => {
+      testRule("VG101", "redirect('/dashboard')", "javascript", false);
+    });
+  });
+
+  describe("VG102 - File path traversal risk", () => {
+    it("detects readFile with req.params", () => {
+      testRule("VG102", "readFile(req.params.filename)", "javascript", true);
+    });
+    it("detects path.join with query param", () => {
+      testRule("VG102", "path.join(uploadDir, req.query.file)", "javascript", true);
+    });
+    it("ignores readFile with static path", () => {
+      testRule("VG102", "readFile('/etc/config.json')", "javascript", false);
+    });
+  });
+
+  describe("VG103 - Prototype pollution risk", () => {
+    it("detects Object.assign with req.body", () => {
+      testRule("VG103", "Object.assign(config, req.body)", "javascript", true);
+    });
+    it("detects merge with body", () => {
+      testRule("VG103", "merge(defaults, body)", "javascript", true);
+    });
+    it("ignores Object.assign with static object", () => {
+      testRule("VG103", "Object.assign(config, { debug: false })", "javascript", false);
     });
   });
 
@@ -193,6 +382,39 @@ describe("Core Rules", () => {
     });
     it("ignores new RegExp with static string", () => {
       testRule("VG107", 'const re = new RegExp("^[a-z]+$")', "javascript", false);
+    });
+  });
+
+  describe("VG108 - Vue v-html Directive with User Data", () => {
+    it("detects v-html with a variable binding", () => {
+      testRule("VG108", '<div v-html="userComment"></div>', "html", true);
+    });
+    it("does not match text interpolation", () => {
+      testRule("VG108", "<div>{{ userComment }}</div>", "html", false);
+    });
+  });
+
+  describe("VG109 - Angular innerHTML Binding with User Data", () => {
+    it("detects [innerHTML] binding with variable", () => {
+      testRule("VG109", '<div [innerHTML]="htmlContent"></div>', "html", true);
+    });
+    it("detects bypassSecurityTrustHtml call", () => {
+      testRule("VG109", "this.sanitizer.bypassSecurityTrustHtml(userInput)", "typescript", true);
+    });
+    it("does not match [innerText] binding", () => {
+      testRule("VG109", '<div [innerText]="userInput"></div>', "html", false);
+    });
+  });
+
+  describe("VG116 - HTML Event Handler Injection via User Input", () => {
+    it("detects string concat with user input in onclick", () => {
+      testRule("VG116", 'onclick="action" + userInput + "end"', "javascript", true);
+    });
+    it("detects string concat with user data in onerror", () => {
+      testRule("VG116", "const tag = '<img onerror=\"handle()\" + userInput + ';", "javascript", true);
+    });
+    it("does not match addEventListener usage", () => {
+      testRule("VG116", 'element.addEventListener("click", handler);', "javascript", false);
     });
   });
 });

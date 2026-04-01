@@ -127,7 +127,7 @@ SOC2, PCI-DSS, HIPAA control mapping with compliance reports
 ### Supply Chain
 Malicious postinstall scripts, unpinned GitHub Actions, typosquat detection
 
-## Tools (12 MCP tools)
+## Tools (22 MCP tools)
 
 | Tool | What it does |
 |------|-------------|
@@ -143,6 +143,16 @@ Malicious postinstall scripts, unpinned GitHub Actions, typosquat detection
 | `export_sarif` | SARIF v2.1.0 export for CI/CD integration |
 | `get_security_docs` | Security best practices and guides |
 | `fix_code` | **Auto-fix suggestions** with concrete patches for AI agents |
+| `audit_config` | Audit project configuration files for cross-file security misconfigurations |
+| `generate_policy` | Detect project stack and generate tailored security policies (CSP, CORS, RLS) |
+| `review_pr` | Review PR diff for security issues with severity gating |
+| `scan_secrets_history` | Scan git history for leaked secrets (active and removed) |
+| `policy_check` | Check project against compliance policies defined in .guardviberc |
+| `analyze_dataflow` | Track tainted data flows from user input to dangerous sinks |
+| `check_command` | Analyze shell commands for security risks before execution |
+| `scan_config_change` | Compare config file versions to detect security downgrades |
+| `repo_security_posture` | Assess overall repository security posture and map sensitive areas |
+| `explain_remediation` | Get detailed remediation guidance with exploit scenarios and fix strategies |
 
 All scanning tools support `format: "json"` for machine-readable output.
 
@@ -310,6 +320,104 @@ Tested on a real 644-file Next.js + Supabase project:
 - Scan time: **502ms**
 - False positive rate: **near zero** (comment/string filtering, human-readable text detection)
 - Detection rate: **100%** on known vulnerability patterns
+
+## Troubleshooting
+
+### MCP connection issues
+
+If your AI agent cannot connect to GuardVibe:
+
+1. **Restart your IDE/agent.** MCP servers are started by the host application. After running `npx guardvibe init`, restart Claude Code, Cursor, or Gemini CLI for the config to take effect.
+2. **Check the config path.** Run `npx guardvibe init claude` again and verify the output shows the correct config file location (`.claude.json` in your project root for Claude Code, `.cursor/mcp.json` for Cursor).
+3. **Verify Node.js version.** GuardVibe requires Node.js >= 18.0.0. Check with `node --version`.
+4. **Check npx cache.** If you upgraded GuardVibe and the old version is cached, run `npx -y guardvibe@latest` to force the latest version.
+
+### Node.js version requirements
+
+GuardVibe requires **Node.js >= 18.0.0**. Earlier versions will fail with syntax errors or missing APIs. Node.js 22 LTS is recommended.
+
+### False positives
+
+If a rule triggers on safe code:
+
+- **Inline suppression:** Add `// guardvibe-ignore VG001` on the same line, or `// guardvibe-ignore-next-line VG001` on the line above. Supports `//`, `#`, and `<!-- -->` comment styles.
+- **Config exclusion:** Add the rule ID to `rules.disable` in `.guardviberc`:
+  ```json
+  { "rules": { "disable": ["VG030"] } }
+  ```
+- **Path exclusion:** Add directories to `scan.exclude` in `.guardviberc`:
+  ```json
+  { "scan": { "exclude": ["fixtures/", "test-data/"] } }
+  ```
+
+### Pre-commit hook issues
+
+- **Hook not running:** Verify the hook file exists at `.git/hooks/pre-commit` and is executable (`chmod +x .git/hooks/pre-commit`).
+- **Hook blocking valid commits:** Use `git commit --no-verify` to skip the hook temporarily, then investigate the findings.
+- **Removing the hook:** Run `npx guardvibe hook uninstall`.
+
+## Security Model
+
+GuardVibe is designed for use on sensitive and proprietary codebases:
+
+- **100% local execution.** All scanning happens on your machine. No code, findings, or metadata are sent to any server.
+- **No accounts, no API keys, no telemetry.** There is no signup, no cloud dashboard, and no usage tracking of any kind.
+- **One optional network call.** The `scan_dependencies` and `check_dependencies` tools query the [OSV API](https://osv.dev/) to check for known CVEs. This is opt-in -- you only call it when you explicitly use those tools. No other tool makes network requests.
+- **Safe for air-gapped environments.** All code analysis rules run entirely offline. Only dependency vulnerability checks require network access.
+
+## Configuration (.guardviberc)
+
+Create a `.guardviberc` JSON file in your project root to customize GuardVibe behavior.
+
+### Full example
+
+```json
+{
+  "rules": {
+    "disable": ["VG030", "VG045"],
+    "severity": {
+      "VG002": "medium",
+      "VG010": "low"
+    }
+  },
+  "scan": {
+    "exclude": ["fixtures/", "coverage/", "dist/", "vendor/"],
+    "maxFileSize": 1048576
+  },
+  "plugins": [
+    "guardvibe-rules-awesome",
+    "./my-local-rules"
+  ],
+  "compliance": {
+    "frameworks": ["SOC2", "HIPAA"],
+    "failOn": "high",
+    "exceptions": [
+      {
+        "ruleId": "VG030",
+        "reason": "Accepted risk per security review 2026-03",
+        "approvedBy": "security-team",
+        "expiresAt": "2026-12-31",
+        "files": ["src/legacy/**"]
+      }
+    ],
+    "requiredControls": ["SOC2:CC6.1"]
+  }
+}
+```
+
+### Configuration fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `rules.disable` | `string[]` | `[]` | Rule IDs to skip during scanning |
+| `rules.severity` | `Record<string, string>` | `{}` | Override severity for specific rules |
+| `scan.exclude` | `string[]` | `[]` | Glob patterns for directories/files to skip |
+| `scan.maxFileSize` | `number` | `512000` | Maximum file size in bytes (files larger than this are skipped) |
+| `plugins` | `string[]` | `[]` | npm package names or local paths to load as plugins |
+| `compliance.frameworks` | `string[]` | -- | Compliance frameworks to map against (`SOC2`, `PCI-DSS`, `HIPAA`, `GDPR`, `ISO27001`) |
+| `compliance.failOn` | `string` | `"high"` | Minimum severity that causes compliance failure |
+| `compliance.exceptions` | `PolicyException[]` | `[]` | Approved exceptions with expiration dates |
+| `compliance.requiredControls` | `string[]` | -- | Controls that must pass regardless of exceptions |
 
 ## Security
 
