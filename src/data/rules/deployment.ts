@@ -278,4 +278,18 @@ export const deploymentRules: SecurityRule[] = [
       '# BAD: breaks container isolation\n# hostNetwork: true\n# hostPID: true\n\n# GOOD: use pod networking\nspec:\n  hostNetwork: false\n  hostPID: false\n  hostIPC: false\n  containers:\n    - name: app\n      securityContext:\n        runAsNonRoot: true',
     compliance: ["SOC2:CC6.1", "PCI-DSS:Req6.5.10"],
   },
+  {
+    id: "VG524",
+    name: "Data URL or Blob URL in User-Controlled src/href",
+    severity: "high",
+    owasp: "A07:2025 Cross-Site Scripting",
+    description:
+      "User-controlled input is used in src or href attributes without blocking data: and blob: URL schemes. data:text/html URLs can embed full HTML pages with scripts, and javascript: URLs execute code — bypassing same-origin restrictions.",
+    pattern: /(?:src|href|action|poster|srcDoc)\s*=\s*\{[\s\S]{0,100}?(?:user|input|param|query|data|url|link|content)[\s\S]{0,100}?(?:(?!(?:startsWith|protocol|scheme|allowlist|whitelist|URL\()[\s\S]{0,50}?))\}/gi,
+    languages: ["javascript", "typescript"],
+    fix: "Validate URL scheme against an allowlist (https: only). Block data:, blob:, and javascript: URLs from user input.",
+    fixCode:
+      '// Validate URL scheme\nfunction isSafeUrl(url: string): boolean {\n  try {\n    const parsed = new URL(url);\n    return ["https:", "http:"].includes(parsed.protocol);\n  } catch {\n    return false;\n  }\n}\n\n// Usage\n<img src={isSafeUrl(userUrl) ? userUrl : "/placeholder.png"} />',
+    compliance: ["SOC2:CC7.1"],
+  },
 ];

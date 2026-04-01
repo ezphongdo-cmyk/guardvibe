@@ -393,4 +393,46 @@ export const coreRules: SecurityRule[] = [
       '// BAD: user controls the regex\nconst re = new RegExp(req.query.search);\n\n// GOOD: escape regex special chars\nfunction escapeRegex(s: string) {\n  return s.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");\n}\nconst re = new RegExp(escapeRegex(req.query.search));\n\n// BETTER: use string methods\nconst results = items.filter(i => i.name.includes(query));',
     compliance: ["SOC2:CC7.1"],
   },
+  {
+    id: "VG108",
+    name: "Vue v-html Directive with User Data",
+    severity: "high",
+    owasp: "A07:2025 Cross-Site Scripting",
+    description:
+      "Vue's v-html directive renders raw HTML without sanitization, equivalent to innerHTML. If user-controlled data is bound via v-html, attackers can inject arbitrary scripts for stored or reflected XSS.",
+    pattern: /v-html\s*=\s*["'](?!['"])\w/gi,
+    languages: ["html", "javascript", "typescript"],
+    fix: "Avoid v-html with user data. Use text interpolation {{ }} or sanitize with DOMPurify before rendering.",
+    fixCode:
+      '<!-- BAD: raw HTML rendering -->\n<!-- <div v-html="userComment"></div> -->\n\n<!-- GOOD: text interpolation (auto-escaped) -->\n<div>{{ userComment }}</div>\n\n<!-- If HTML needed: sanitize first -->\n<div v-html="DOMPurify.sanitize(userComment)"></div>',
+    compliance: ["SOC2:CC7.1"],
+  },
+  {
+    id: "VG109",
+    name: "Angular innerHTML Binding with User Data",
+    severity: "high",
+    owasp: "A07:2025 Cross-Site Scripting",
+    description:
+      "Angular's [innerHTML] property binding renders HTML content. While Angular's built-in sanitizer strips scripts, it can be bypassed with bypassSecurityTrustHtml() or via CSS/SVG-based XSS vectors.",
+    pattern: /(?:\[innerHTML\]\s*=\s*["']\w|bypassSecurityTrustHtml\s*\()/gi,
+    languages: ["html", "typescript"],
+    fix: "Avoid [innerHTML] with user data. If unavoidable, never use bypassSecurityTrustHtml() on user input.",
+    fixCode:
+      '<!-- BAD: bypass Angular sanitizer -->\n<!-- <div [innerHTML]="trustedHtml"></div> -->\n<!-- this.trustedHtml = this.sanitizer.bypassSecurityTrustHtml(userInput); -->\n\n<!-- GOOD: let Angular sanitize automatically -->\n<div [innerText]="userInput"></div>\n<!-- Or use Angular pipe with DOMPurify -->',
+    compliance: ["SOC2:CC7.1"],
+  },
+  {
+    id: "VG116",
+    name: "HTML Event Handler Injection via User Input",
+    severity: "high",
+    owasp: "A07:2025 Cross-Site Scripting",
+    description:
+      "User input is interpolated into HTML attributes that accept JavaScript (onclick, onerror, onload, onmouseover, onfocus). Even without script tags, event handlers execute arbitrary JavaScript when the element is interacted with or loads.",
+    pattern: /(?:on(?:click|error|load|mouseover|focus|blur|submit|change|input|keyup|keydown))\s*=\s*(?:`[^`]*\$\{|["'][^"']*["']\s*\+\s*(?:user|input|query|param|req\.|data\.))/gi,
+    languages: ["javascript", "typescript", "html"],
+    fix: "Never interpolate user input into HTML event handler attributes. Use addEventListener with sanitized data instead.",
+    fixCode:
+      '// BAD: user input in event handler\n// `<img onerror="${userInput}">`\n\n// GOOD: use addEventListener\nconst img = document.createElement("img");\nimg.addEventListener("error", () => handleError(sanitizedInput));',
+    compliance: ["SOC2:CC7.1"],
+  },
 ];

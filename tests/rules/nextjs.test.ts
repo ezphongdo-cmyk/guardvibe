@@ -60,4 +60,22 @@ describe("Next.js Rules", () => {
       testRule("VG413", 'serverActions: { allowedOrigins: ["myapp.com"] }', false);
     });
   });
+
+  describe("VG414 - Server-Side Template Injection (SSTI)", () => {
+    it("detects EJS unescaped output tag", () => {
+      testRule("VG414", '<%- userInput %>', true);
+    });
+    it("detects Handlebars triple-brace unescaped output", () => {
+      testRule("VG414", '{{{ userInput }}}', true);
+    });
+    it("detects Nunjucks safe filter", () => {
+      testRule("VG414", '{{ content | safe }}', true);
+    });
+    it("does not match EJS escaped output tag", () => {
+      testRule("VG414", '<%= userInput %>', false);
+    });
+    it("does not match Handlebars double-brace escaped output", () => {
+      testRule("VG414", '{{ userInput }}', false);
+    });
+  });
 });

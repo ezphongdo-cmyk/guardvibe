@@ -70,6 +70,39 @@ describe("Core Rules", () => {
     });
   });
 
+  describe("VG108 - Vue v-html Directive with User Data", () => {
+    it("detects v-html with a variable binding", () => {
+      testRule("VG108", '<div v-html="userComment"></div>', "html", true);
+    });
+    it("does not match text interpolation", () => {
+      testRule("VG108", "<div>{{ userComment }}</div>", "html", false);
+    });
+  });
+
+  describe("VG109 - Angular innerHTML Binding with User Data", () => {
+    it("detects [innerHTML] binding with variable", () => {
+      testRule("VG109", '<div [innerHTML]="htmlContent"></div>', "html", true);
+    });
+    it("detects bypassSecurityTrustHtml call", () => {
+      testRule("VG109", "this.sanitizer.bypassSecurityTrustHtml(userInput)", "typescript", true);
+    });
+    it("does not match [innerText] binding", () => {
+      testRule("VG109", '<div [innerText]="userInput"></div>', "html", false);
+    });
+  });
+
+  describe("VG116 - HTML Event Handler Injection via User Input", () => {
+    it("detects string concat with user input in onclick", () => {
+      testRule("VG116", `onclick="action" + userInput + "end"`, "javascript", true);
+    });
+    it("detects string concat with user data in onerror", () => {
+      testRule("VG116", `const tag = '<img onerror="handle()" + userInput + '">';`, "javascript", true);
+    });
+    it("does not match addEventListener usage", () => {
+      testRule("VG116", 'element.addEventListener("click", handler);', "javascript", false);
+    });
+  });
+
   describe("VG060 - Weak hashing", () => {
     it("detects md5", () => {
       testRule("VG060", 'createHash("md5")', "javascript", true);

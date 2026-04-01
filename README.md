@@ -1,6 +1,6 @@
 # GuardVibe
 
-**The security MCP built for vibe coding.** 267 security rules covering the entire AI-generated code journey — from first line to production deployment.
+**The security MCP built for vibe coding.** 277 security rules covering the entire AI-generated code journey — from first line to production deployment.
 
 Works with **Claude Code, Cursor, Gemini CLI, Codex, Windsurf**, and any MCP-compatible coding agent.
 
@@ -8,7 +8,7 @@ Works with **Claude Code, Cursor, Gemini CLI, Codex, Windsurf**, and any MCP-com
 
 Most security tools are built for enterprise security teams. GuardVibe is built for **you** — the developer using AI to build and ship web apps fast.
 
-- **267 security rules** purpose-built for the stacks AI agents generate
+- **277 security rules** purpose-built for the stacks AI agents generate
 - **Zero setup friction** — `npx guardvibe` and you're scanning
 - **No account required** — runs 100% locally, no API keys, no cloud
 - **Understands your stack** — not generic SAST, but rules that know Next.js, Supabase, Stripe, Clerk, and the tools you actually use
@@ -34,7 +34,7 @@ GuardVibe is purpose-built for the AI coding workflow. Traditional tools are exc
 | CVE version detection | 21 packages | Extensive | Extensive |
 | Compliance mapping (SOC2, PCI-DSS, HIPAA) | Built-in | Paid tier | None |
 | SARIF CI/CD export | Yes | Yes | Limited |
-| Rule count | 267 (focused) | 5000+ (broad) | N/A |
+| Rule count | 277 (focused) | 5000+ (broad) | N/A |
 
 **When to use GuardVibe:** You're building with AI agents and want security scanning integrated into your coding workflow — no dashboard, no account, no CI setup.
 
@@ -146,7 +146,7 @@ Malicious postinstall scripts, unpinned GitHub Actions, typosquat detection
 
 All scanning tools support `format: "json"` for machine-readable output.
 
-## Security Rules (267 rules across 23 modules)
+## Security Rules (277 rules across 23 modules)
 
 | Category | Rules | Coverage |
 |----------|-------|----------|

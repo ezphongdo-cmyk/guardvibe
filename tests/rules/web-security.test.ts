@@ -36,4 +36,20 @@ describe("Web Security Rules", () => {
   it("VG677: allows env var OpenAI key", () => {
     testRule("VG677", "const openai = new OpenAI()", false);
   });
+
+  describe("VG678 - Missing X-Content-Type-Options Header", () => {
+    it("detects sendFile response without nosniff header", () => {
+      testRule("VG678", `app.get("/uploads/:name", (req, res) => {
+  const filePath = path.join(uploadDir, req.params.name);
+  res.sendFile(filePath);
+  res.end();
+});`, true);
+    });
+    it("does not match when nosniff header is present", () => {
+      testRule("VG678", `app.get("/uploads/:name", (req, res) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.sendFile(filePath);
+});`, false);
+    });
+  });
 });

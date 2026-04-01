@@ -382,4 +382,100 @@ describe("Modern Stack Security Rules", () => {
       ));
     });
   });
+
+  // =====================================================
+  // SVG Upload
+  // =====================================================
+  describe("VG990 - SVG File Upload Without Content Sanitization", () => {
+    it("detects SVG in allowed MIME types array", () => {
+      assert(hasRule(
+        `const allowedMimeTypes = ["image/png", "image/jpeg", "image/svg+xml"];`,
+        "VG990"
+      ));
+    });
+    it("detects .svg in file types config", () => {
+      assert(hasRule(
+        `const allowedTypes = [".png", ".jpg", ".svg"];`,
+        "VG990"
+      ));
+    });
+    it("does not match when SVG is not in allowed types", () => {
+      assert(!hasRule(
+        `const allowedMimeTypes = ["image/png", "image/jpeg", "image/webp"];`,
+        "VG990"
+      ));
+    });
+  });
+
+  // =====================================================
+  // Markdown XSS
+  // =====================================================
+  describe("VG991 - Markdown Rendered as HTML Without Sanitization", () => {
+    it("detects marked output used with innerHTML", () => {
+      assert(hasRule(
+        `const html = marked(userInput);\nelement.innerHTML = html;`,
+        "VG991"
+      ));
+    });
+    it("detects markdown-it output used with dangerouslySetInnerHTML (sanitization test)", () => {
+      assert(hasRule(
+        `const md = markdownIt();\nconst result = md.render(content);\nreturn React.createElement("div", { dangerouslySetInnerHTML: { __html: result } });`,
+        "VG991"
+      ));
+    });
+    it("does not match marked without innerHTML rendering", () => {
+      assert(!hasRule(
+        `const html = marked(userInput);\nconst clean = DOMPurify.sanitize(html);`,
+        "VG991"
+      ));
+    });
+  });
+
+  // =====================================================
+  // Rich Text Editor XSS
+  // =====================================================
+  describe("VG992 - Rich Text Editor Output Without Sanitization", () => {
+    it("detects editor.getHTML used with dangerouslySetInnerHTML (sanitization test)", () => {
+      assert(hasRule(
+        `const content = editor.getHTML();\nreturn React.createElement("div", { dangerouslySetInnerHTML: { __html: content } });`,
+        "VG992"
+      ));
+    });
+    it("detects convertToHTML used with innerHTML", () => {
+      assert(hasRule(
+        `const html = convertToHTML(editorState);\nelement.innerHTML = html;`,
+        "VG992"
+      ));
+    });
+    it("does not match editor output without innerHTML rendering", () => {
+      assert(!hasRule(
+        `const content = editor.getHTML();\nconst clean = DOMPurify.sanitize(content);`,
+        "VG992"
+      ));
+    });
+  });
+
+  // =====================================================
+  // Upload Filename
+  // =====================================================
+  describe("VG993 - Upload Filename Used Without Sanitization", () => {
+    it("detects originalname used directly in writeFile", () => {
+      assert(hasRule(
+        `const name = req.file.originalname;\nawait fs.writeFile(\`/uploads/\${name}\`, buffer);`,
+        "VG993"
+      ));
+    });
+    it("detects file.name used directly in upload", () => {
+      assert(hasRule(
+        `const fname = file.name;\nawait s3.upload({ Key: fname, Body: file });`,
+        "VG993"
+      ));
+    });
+    it("does not match UUID-based filename", () => {
+      assert(!hasRule(
+        `const safeName = randomUUID() + ".png";\nawait fs.writeFile(\`/uploads/\${safeName}\`, buffer);`,
+        "VG993"
+      ));
+    });
+  });
 });

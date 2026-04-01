@@ -208,4 +208,18 @@ export const nextjsRules: SecurityRule[] = [
       '// next.config.ts\nexport default {\n  serverActions: {\n    allowedOrigins: ["myapp.com", "*.myapp.com"],\n  },\n};',
     compliance: ["SOC2:CC6.6"],
   },
+  {
+    id: "VG414",
+    name: "Server-Side Template Injection (SSTI)",
+    severity: "critical",
+    owasp: "A02:2025 Injection",
+    description:
+      "User input is rendered using an unescaped template directive (EJS <%- %>, Handlebars {{{ }}}, Pug != operator, Nunjucks | safe filter). These directives bypass HTML escaping, allowing attackers to inject arbitrary HTML and JavaScript that executes server-side or client-side.",
+    pattern: /(?:<%-\s*\w|(?:\{\{\{)\s*\w|!=\s*\w[\s\S]{0,50}?(?:user|input|query|body|param|req\.|data\.)|\|\s*safe\s*(?:\}\}|\%\}))/gi,
+    languages: ["javascript", "typescript", "html"],
+    fix: "Always use escaped template directives: EJS <%= %>, Handlebars {{ }}, Pug =. Only use unescaped rendering for trusted, developer-controlled content.",
+    fixCode:
+      '<!-- EJS: use escaped output -->\n<p><%= userInput %></p>   <!-- SAFE: HTML-escaped -->\n<!-- NOT: <%- userInput %>  DANGEROUS: raw HTML -->\n\n<!-- Handlebars: use double braces -->\n<p>{{userInput}}</p>      <!-- SAFE: escaped -->\n<!-- NOT: {{{userInput}}}   DANGEROUS: raw HTML -->\n\n<!-- Pug: use = not != -->\np= userInput              //- SAFE: escaped\n//- NOT: p!= userInput    DANGEROUS: raw HTML',
+    compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.1"],
+  },
 ];

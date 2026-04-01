@@ -515,4 +515,60 @@ export const modernStackRules: SecurityRule[] = [
       '// Express: trust only your reverse proxy\napp.set("trust proxy", 1); // trust first proxy\n\n// Rate limiter: use req.ip (respects trust proxy)\nimport rateLimit from "express-rate-limit";\nconst limiter = rateLimit({\n  keyGenerator: (req) => req.ip, // uses trusted proxy chain\n  max: 100,\n  windowMs: 15 * 60 * 1000,\n});',
     compliance: ["SOC2:CC7.1"],
   },
+  {
+    id: "VG990",
+    name: "SVG File Upload Without Content Sanitization",
+    severity: "critical",
+    owasp: "A07:2025 Cross-Site Scripting",
+    description:
+      "File upload accepts SVG files but does not scan or sanitize SVG content. SVG files can contain embedded <script> tags, event handlers (onload, onclick), and external resource references that execute JavaScript when the SVG is rendered in a browser.",
+    pattern: /(?:(?:allowedMimeTypes|accept|mimeTypes|fileTypes|allowedTypes|contentType)\s*[:=]\s*(?:\[[\s\S]*?|['"`])[\s\S]{0,100}?(?:svg|image\/svg|\.svg))/gi,
+    languages: ["javascript", "typescript"],
+    fix: "Either reject SVG uploads entirely or sanitize SVG content by stripping script tags, event handlers, and external references. Use a library like DOMPurify with SVG profile.",
+    fixCode:
+      '// Option 1: Reject SVGs\nconst ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp"]; // no SVG\n\n// Option 2: Sanitize SVG content\nimport DOMPurify from "dompurify";\nconst cleanSvg = DOMPurify.sanitize(svgContent, {\n  USE_PROFILES: { svg: true, svgFilters: true },\n  FORBID_TAGS: ["script", "foreignObject"],\n  FORBID_ATTR: ["onclick", "onerror", "onload"],\n});',
+    compliance: ["SOC2:CC7.1"],
+  },
+  {
+    id: "VG991",
+    name: "Markdown Rendered as HTML Without Sanitization",
+    severity: "high",
+    owasp: "A07:2025 Cross-Site Scripting",
+    description:
+      "Markdown library output (marked, showdown, markdown-it, remark) is rendered as HTML without sanitization. Most markdown parsers allow raw HTML by default — user-submitted markdown like `<img onerror=alert(1)>` passes through as executable HTML.",
+    pattern: /(?:marked|showdown|markdownIt|markdown-it|unified|remark|rehype)[\s\S]{0,300}?(?:innerHTML|dangerouslySetInnerHTML|v-html|\[innerHTML\]|\.html\s*\(|res\.send)/gi,
+    languages: ["javascript", "typescript"],
+    fix: "Sanitize markdown HTML output with DOMPurify before rendering, or configure the parser to disable raw HTML.",
+    fixCode:
+      '// BAD: unsanitized markdown\n// element.innerHTML = marked.parse(userMarkdown);\n\n// GOOD: sanitize after parsing\nimport DOMPurify from "dompurify";\nimport { marked } from "marked";\nconst html = DOMPurify.sanitize(marked.parse(userMarkdown));\n\n// Or disable HTML in parser\nmarked.setOptions({ sanitize: true });\n// markdown-it: const md = markdownIt({ html: false });',
+    compliance: ["SOC2:CC7.1"],
+  },
+  {
+    id: "VG992",
+    name: "Rich Text Editor Output Without Sanitization",
+    severity: "high",
+    owasp: "A07:2025 Cross-Site Scripting",
+    description:
+      "WYSIWYG/rich text editor content (TipTap, Draft.js, Slate, Quill, CKEditor, TinyMCE) is rendered via innerHTML or dangerouslySetInnerHTML without sanitization. Editor output is user-controlled HTML that can contain XSS payloads — especially if the editor allows source code editing or paste from external sources.",
+    pattern: /(?:editor\.getHTML|getContent|convertToHTML|stateToHTML|serialize|draftToHtml|renderToString)[\s\S]{0,300}?(?:innerHTML|dangerouslySetInnerHTML|v-html|\[innerHTML\])/gi,
+    languages: ["javascript", "typescript"],
+    fix: "Always sanitize rich text editor output with DOMPurify before rendering, even if the editor has its own sanitization.",
+    fixCode:
+      '// BAD: direct editor output rendering\n// <div dangerouslySetInnerHTML={{ __html: editor.getHTML() }} />\n\n// GOOD: sanitize editor output\nimport DOMPurify from "dompurify";\nconst cleanHtml = DOMPurify.sanitize(editor.getHTML(), {\n  ALLOWED_TAGS: ["p", "b", "i", "em", "strong", "a", "ul", "ol", "li", "br", "h1", "h2", "h3"],\n  ALLOWED_ATTR: ["href", "target", "rel"],\n});\n<div dangerouslySetInnerHTML={{ __html: cleanHtml }} />',
+    compliance: ["SOC2:CC7.1"],
+  },
+  {
+    id: "VG993",
+    name: "Upload Filename Used Without Sanitization",
+    severity: "high",
+    owasp: "A01:2025 Broken Access Control",
+    description:
+      "User-uploaded file's original filename is used directly for storage without sanitization. Attackers can use directory traversal (../../etc/passwd), null bytes (file.php%00.jpg), double extensions (file.jpg.exe), or Unicode tricks to overwrite files, bypass type checks, or achieve remote code execution.",
+    pattern: /(?:file\.name|originalname|filename|req\.file\.originalname|formData\.get\s*\(\s*['"]file['"])\s*[\s\S]{0,100}?(?:writeFile|createWriteStream|save|upload|putObject|mv\s*\(|rename|storage)/gi,
+    languages: ["javascript", "typescript"],
+    fix: "Generate a random filename (UUID/nanoid) and validate the extension against an allowlist. Never use the original filename for storage.",
+    fixCode:
+      'import { randomUUID } from "crypto";\nimport path from "path";\n\n// Generate safe filename\nconst ext = path.extname(file.name).toLowerCase();\nconst ALLOWED_EXT = [".jpg", ".jpeg", ".png", ".webp", ".pdf"];\nif (!ALLOWED_EXT.includes(ext)) throw new Error("Invalid file type");\nconst safeName = `${randomUUID()}${ext}`;\nawait fs.writeFile(`/uploads/${safeName}`, buffer);',
+    compliance: ["SOC2:CC7.1"],
+  },
 ];

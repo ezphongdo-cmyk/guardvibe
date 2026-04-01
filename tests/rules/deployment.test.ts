@@ -75,4 +75,16 @@ describe("Deployment Config Rules", () => {
       testRule("VG523", "hostNetwork: false", false);
     });
   });
+
+  describe("VG524 - Data URL or Blob URL in User-Controlled src/href", () => {
+    it("detects user input in src attribute without validation", () => {
+      testRule("VG524", `<img src={userInput} />`, true);
+    });
+    it("detects user data in href attribute without validation", () => {
+      testRule("VG524", `<a href={userData} />`, true);
+    });
+    it("does not match static src attribute", () => {
+      testRule("VG524", `<img src="/images/logo.png" />`, false);
+    });
+  });
 });

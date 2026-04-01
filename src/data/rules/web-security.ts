@@ -188,4 +188,18 @@ export const webSecurityRules: SecurityRule[] = [
     fixCode: "// Reads from OPENAI_API_KEY env automatically\nconst openai = new OpenAI();",
     compliance: ["SOC2:CC6.1"],
   },
+  {
+    id: "VG678",
+    name: "Missing X-Content-Type-Options Header",
+    severity: "high",
+    owasp: "A05:2021 Security Misconfiguration",
+    description:
+      "Response serving user-uploaded files does not set X-Content-Type-Options: nosniff. Browsers may MIME-sniff the content and execute uploaded files as HTML/JavaScript, enabling stored XSS via file uploads.",
+    pattern: /(?:createReadStream|sendFile|send\s*\(|pipe\s*\(|res\.download|res\.sendFile|getSignedUrl|getPublicUrl)[\s\S]{0,500}?(?:(?!X-Content-Type-Options|nosniff)[\s\S]){10,}?(?:res\.end|\.pipe|return|response)/gi,
+    languages: ["javascript", "typescript"],
+    fix: "Set X-Content-Type-Options: nosniff on all responses serving user-uploaded content.",
+    fixCode:
+      '// Set nosniff header for uploaded file responses\nres.setHeader("X-Content-Type-Options", "nosniff");\nres.setHeader("Content-Disposition", "attachment"); // force download for unknown types\nres.sendFile(filePath);',
+    compliance: ["SOC2:CC6.1"],
+  },
 ];
