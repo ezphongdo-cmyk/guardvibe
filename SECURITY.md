@@ -12,7 +12,7 @@
 If you discover a security vulnerability in GuardVibe, please report it responsibly:
 
 1. **Do NOT open a public GitHub issue.**
-2. Email **security@goklab.com** with:
+2. Email **info@goklab.com** with:
    - Description of the vulnerability
    - Steps to reproduce
    - Potential impact

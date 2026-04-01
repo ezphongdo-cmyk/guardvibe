@@ -435,7 +435,7 @@ GuardVibe takes supply chain security seriously:
 - **Minimal CI permissions** — GitHub Actions workflows use `permissions: contents: read` only
 - **Zero runtime dependencies** — only MCP SDK and Zod (both widely audited)
 
-To report a vulnerability, please email security@goklab.com or open a GitHub issue.
+To report a vulnerability, please email info@goklab.com or open a GitHub issue.
 
 ## License
 

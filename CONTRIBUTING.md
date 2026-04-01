@@ -138,7 +138,7 @@ Plugins can also export custom `tools` (implementing `GuardVibeTool`). Name your
 
 ## Reporting Security Issues
 
-To report a vulnerability in GuardVibe itself, email security@goklab.com or open a GitHub issue.
+To report a vulnerability in GuardVibe itself, email info@goklab.com or open a GitHub issue.
 
 ## License
 
