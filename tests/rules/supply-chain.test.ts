@@ -77,4 +77,64 @@ describe("Supply Chain Rules", () => {
       testRule("VG865", "*.map\n.env\nsrc/", false);
     });
   });
+
+  describe("VG866 - Invisible Unicode Characters", () => {
+    it("detects zero-width space in source code", () => {
+      testRule("VG866", "const x = 'hello\u200Bworld';", true);
+    });
+    it("detects BOM character in source code", () => {
+      testRule("VG866", "const y = \uFEFFsomething;", true);
+    });
+    it("detects soft hyphen in source code", () => {
+      testRule("VG866", "const z = 'test\u00ADvalue';", true);
+    });
+    it("ignores normal source code", () => {
+      testRule("VG866", "const x = 'hello world';", false);
+    });
+  });
+
+  describe("VG867 - Obfuscated Payload in Install Script", () => {
+    it("detects Buffer.from in postinstall", () => {
+      testRule("VG867", '"postinstall": "node -e Buffer.from(\'payload\', \'base64\')"', true);
+    });
+    it("detects atob in preinstall", () => {
+      testRule("VG867", '"preinstall": "node -e atob(\'cGF5bG9hZA==\')"', true);
+    });
+    it("detects hex escape in postinstall", () => {
+      testRule("VG867", '"postinstall": "node -e \\x68\\x65\\x6c\\x6c\\x6f"', true);
+    });
+    it("ignores safe postinstall script", () => {
+      testRule("VG867", '"postinstall": "prisma generate"', false);
+    });
+  });
+
+  describe("VG868 - Install Script Accesses Credential Files", () => {
+    it("detects .npmrc access in postinstall", () => {
+      testRule("VG868", '"postinstall": "node -e readFile(.npmrc)"', true);
+    });
+    it("detects .ssh access in preinstall", () => {
+      testRule("VG868", '"preinstall": "cat .ssh/id_rsa"', true);
+    });
+    it("detects .env access in postinstall", () => {
+      testRule("VG868", '"postinstall": "node steal.js .env"', true);
+    });
+    it("ignores safe install script", () => {
+      testRule("VG868", '"postinstall": "patch-package"', false);
+    });
+  });
+
+  describe("VG869 - Self-Deleting Payload", () => {
+    it("detects unlinkSync in postinstall", () => {
+      testRule("VG869", '"postinstall": "node setup.js && fs.unlinkSync(setup.js)"', true);
+    });
+    it("detects rm -f on install script", () => {
+      testRule("VG869", '"postinstall": "node install.js && rm -f install.js"', true);
+    });
+    it("detects rimraf on setup script", () => {
+      testRule("VG869", '"postinstall": "node setup.js && rimraf setup.js"', true);
+    });
+    it("ignores normal postinstall", () => {
+      testRule("VG869", '"postinstall": "patch-package"', false);
+    });
+  });
 });

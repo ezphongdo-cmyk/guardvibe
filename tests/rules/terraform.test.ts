@@ -27,4 +27,16 @@ describe("Terraform Rules", () => {
   it("VG304: detects hardcoded password", () => {
     testRule("VG304", 'password = "SuperSecret123!"', true);
   });
+
+  describe("VG305 - Terraform State File Tracked in Git", () => {
+    it("detects terraform.tfstate reference", () => {
+      testRule("VG305", "terraform.tfstate", true);
+    });
+    it("detects .tfstate file reference", () => {
+      testRule("VG305", "backup.tfstate", true);
+    });
+    it("ignores terraform.tf file", () => {
+      testRule("VG305", "main.tf", false);
+    });
+  });
 });

@@ -487,4 +487,32 @@ export const modernStackRules: SecurityRule[] = [
       'export const webhook = httpAction(async (ctx, request) => {\n  const token = request.headers.get("Authorization")?.replace("Bearer ", "");\n  if (!token) return new Response("Unauthorized", { status: 401 });\n  await ctx.runMutation(...);\n});',
     compliance: ["SOC2:CC6.6"],
   },
+  {
+    id: "VG988",
+    name: "GraphQL Batched Query Abuse",
+    severity: "medium",
+    owasp: "A04:2023 Unrestricted Resource Consumption",
+    description:
+      "GraphQL server has query batching enabled (allowBatchedHttpRequests: true). Attackers can bypass rate limiting by sending hundreds of queries in a single HTTP request — each query counts as one request but executes independently. Also enables brute-force attacks against authentication mutations.",
+    pattern: /(?:allowBatchedHttpRequests|batching)\s*:\s*true/gi,
+    languages: ["javascript", "typescript"],
+    fix: "Disable query batching or add per-query rate limiting. If batching is needed, limit the batch size.",
+    fixCode:
+      '// Disable batching\nconst server = new ApolloServer({\n  typeDefs,\n  resolvers,\n  allowBatchedHttpRequests: false,\n});\n\n// Or limit batch size if needed\nconst server = new ApolloServer({\n  allowBatchedHttpRequests: true,\n  plugins: [ApolloServerPluginBatchHttpLink({ maxBatchSize: 5 })],\n});',
+    compliance: ["SOC2:CC7.1"],
+  },
+  {
+    id: "VG989",
+    name: "Rate Limit Bypass via X-Forwarded-For Trust",
+    severity: "high",
+    owasp: "A04:2023 Unrestricted Resource Consumption",
+    description:
+      "Rate limiter uses X-Forwarded-For or X-Real-IP header as the client identifier without a trusted proxy configuration. Attackers can bypass rate limits by sending different spoofed IP addresses in each request.",
+    pattern: /(?:req\.headers\[['"]x-forwarded-for['"]\]|req\.header\s*\(\s*['"]x-forwarded-for['"]\)|req\.ip|request\.headers\.get\s*\(\s*['"]x-forwarded-for['"]\))[\s\S]{0,200}?(?:rateLimit|limiter|throttle|identifier|key\s*:|keyGenerator)/gi,
+    languages: ["javascript", "typescript"],
+    fix: "Configure your rate limiter to use the real client IP from a trusted proxy. Set Express trust proxy or use platform-provided IP (e.g., Vercel's x-real-ip behind their proxy).",
+    fixCode:
+      '// Express: trust only your reverse proxy\napp.set("trust proxy", 1); // trust first proxy\n\n// Rate limiter: use req.ip (respects trust proxy)\nimport rateLimit from "express-rate-limit";\nconst limiter = rateLimit({\n  keyGenerator: (req) => req.ip, // uses trusted proxy chain\n  max: 100,\n  windowMs: 15 * 60 * 1000,\n});',
+    compliance: ["SOC2:CC7.1"],
+  },
 ];

@@ -56,4 +56,32 @@ export const dockerfileRules: SecurityRule[] = [
     fix: "Use COPY instead of ADD for local files. Only use ADD for URLs or tar extraction.",
     fixCode: "# Use COPY for local files\nCOPY ./src /app/src\n# Only use ADD for remote files or tar extraction\n# ADD https://example.com/file.tar.gz /app/",
   },
+  {
+    id: "VG205",
+    name: "Docker Socket Mount",
+    severity: "critical",
+    owasp: "A05:2025 Security Misconfiguration",
+    description:
+      "Docker socket (/var/run/docker.sock) is mounted into a container. This grants the container full control over the Docker daemon — equivalent to root access on the host. CVE-2025-9074 and numerous container escape attacks exploit this.",
+    pattern: /(?:-v|--volume|volumes:)\s*.*\/var\/run\/docker\.sock/gi,
+    languages: ["yaml", "dockerfile", "shell"],
+    fix: "Never mount the Docker socket into application containers. Use Docker-in-Docker (dind) with TLS for CI runners that need Docker access.",
+    fixCode:
+      '# BAD: full host Docker access\n# -v /var/run/docker.sock:/var/run/docker.sock\n\n# GOOD: use Docker-in-Docker with TLS for CI\nservices:\n  dind:\n    image: docker:dind\n    privileged: true\n    environment:\n      DOCKER_TLS_CERTDIR: /certs',
+    compliance: ["SOC2:CC6.1", "PCI-DSS:Req6.5.10"],
+  },
+  {
+    id: "VG206",
+    name: "Dockerfile Missing HEALTHCHECK",
+    severity: "medium",
+    owasp: "A05:2025 Security Misconfiguration",
+    description:
+      "Dockerfile has CMD or ENTRYPOINT but no HEALTHCHECK instruction. Without health checks, orchestrators cannot detect when the application is unresponsive, leading to silent failures and stale container routing.",
+    pattern: /^FROM\s+\S+[\s\S]*?(?:CMD|ENTRYPOINT)\s+(?:(?!HEALTHCHECK)[\s\S])*$/gim,
+    languages: ["dockerfile"],
+    fix: "Add a HEALTHCHECK instruction to verify the application is responding.",
+    fixCode:
+      'HEALTHCHECK --interval=30s --timeout=3s --retries=3 \\\n  CMD curl -f http://localhost:3000/health || exit 1\n\nCMD ["node", "server.js"]',
+    compliance: ["SOC2:CC7.1"],
+  },
 ];

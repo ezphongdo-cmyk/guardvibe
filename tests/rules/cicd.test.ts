@@ -26,4 +26,52 @@ describe("CI/CD Rules", () => {
     const findings = analyzeCode(code, "yaml", undefined, "config/settings.yml");
     assert(!findings.some(f => f.rule.id === "VG213"));
   });
+
+  it("VG214: detects expression injection via issue title", () => {
+    const code = 'run: echo "${{ github.event.issue.title }}"';
+    const findings = analyzeCode(code, "yaml", undefined, ".github/workflows/ci.yml");
+    assert(findings.some(f => f.rule.id === "VG214"));
+  });
+
+  it("VG214: detects expression injection via PR body", () => {
+    const code = 'run: echo "${{ github.event.pull_request.body }}"';
+    const findings = analyzeCode(code, "yaml", undefined, ".github/workflows/ci.yml");
+    assert(findings.some(f => f.rule.id === "VG214"));
+  });
+
+  it("VG214: does not trigger on safe env usage", () => {
+    const code = 'run: echo "$ISSUE_TITLE"\n  env:\n    ISSUE_TITLE: ${{ github.event.issue.title }}';
+    const findings = analyzeCode(code, "yaml", undefined, ".github/workflows/ci.yml");
+    assert(!findings.some(f => f.rule.id === "VG214"));
+  });
+
+  it("VG215: detects third-party action with tag reference", () => {
+    const code = "uses: someorg/deploy-action@v4 ";
+    const findings = analyzeCode(code, "yaml", undefined, ".github/workflows/deploy.yml");
+    assert(findings.some(f => f.rule.id === "VG215"));
+  });
+
+  it("VG215: does not trigger on official actions with tag", () => {
+    const code = "uses: actions/checkout@v4 ";
+    const findings = analyzeCode(code, "yaml", undefined, ".github/workflows/ci.yml");
+    assert(!findings.some(f => f.rule.id === "VG215"));
+  });
+
+  it("VG216: detects npm test in pull_request_target workflow", () => {
+    const code = "on:\n  pull_request_target:\n    branches: [main]\nsteps:\n  - run: npm test";
+    const findings = analyzeCode(code, "yaml", undefined, ".github/workflows/ci.yml");
+    assert(findings.some(f => f.rule.id === "VG216"));
+  });
+
+  it("VG216: detects make in pull_request_target workflow", () => {
+    const code = "on:\n  pull_request_target:\n    branches: [main]\nsteps:\n  - run: make build";
+    const findings = analyzeCode(code, "yaml", undefined, ".github/workflows/ci.yml");
+    assert(findings.some(f => f.rule.id === "VG216"));
+  });
+
+  it("VG216: does not trigger on pull_request (safe trigger)", () => {
+    const code = "on:\n  pull_request:\n    branches: [main]\nsteps:\n  - run: npm test";
+    const findings = analyzeCode(code, "yaml", undefined, ".github/workflows/ci.yml");
+    assert(!findings.some(f => f.rule.id === "VG216"));
+  });
 });

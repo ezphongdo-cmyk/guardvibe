@@ -61,4 +61,18 @@ export const terraformRules: SecurityRule[] = [
     fixCode: 'variable "db_password" {\n  type      = string\n  sensitive = true\n}\n\nresource "aws_db_instance" "example" {\n  password = var.db_password\n}',
     compliance: ["SOC2:CC6.1", "PCI-DSS:Req2.3", "HIPAA:§164.312(a)"],
   },
+  {
+    id: "VG305",
+    name: "Terraform State File Tracked in Git",
+    severity: "critical",
+    owasp: "A01:2025 Broken Access Control",
+    description:
+      "Terraform state file (*.tfstate) contains all infrastructure secrets in plaintext — database passwords, API keys, private IPs. If committed to git, these secrets are exposed in the repository history permanently.",
+    pattern: /(?:terraform\.tfstate|\.tfstate)/gi,
+    languages: ["terraform", "shell"],
+    fix: "Add *.tfstate and *.tfstate.* to .gitignore. Use remote backends (S3, GCS, Terraform Cloud) with encryption enabled.",
+    fixCode:
+      '# .gitignore\n*.tfstate\n*.tfstate.*\n\n# Use encrypted remote backend\nterraform {\n  backend "s3" {\n    bucket  = "my-tf-state"\n    key     = "prod/terraform.tfstate"\n    encrypt = true\n  }\n}',
+    compliance: ["SOC2:CC6.1", "PCI-DSS:Req2.3", "HIPAA:§164.312(a)"],
+  },
 ];

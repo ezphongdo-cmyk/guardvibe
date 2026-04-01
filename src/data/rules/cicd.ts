@@ -45,4 +45,46 @@ export const cicdRules: SecurityRule[] = [
     fix: "Specify minimum required permissions for each job.",
     fixCode: "# Use least-privilege permissions\npermissions:\n  contents: read\n  pull-requests: write",
   },
+  {
+    id: "VG214",
+    name: "GitHub Actions Expression Injection",
+    severity: "critical",
+    owasp: "A02:2025 Injection",
+    description:
+      "Untrusted input from github.event context (issue title, PR body, comment body, head ref) is interpolated in a run step. Attackers can inject arbitrary shell commands via crafted issue titles or PR descriptions. This caused CVE-2025-53104 and compromised thousands of repos.",
+    pattern: /run:\s*.*\$\{\{\s*github\.event\.(?:issue|pull_request|comment|discussion|review|head_commit)\.(?:title|body|head\.ref|label\.name|message)/gi,
+    languages: ["yaml"],
+    fix: "Never interpolate github.event data in run steps. Pass it through an environment variable instead.",
+    fixCode:
+      '# BAD: direct interpolation\n- run: echo "${{ github.event.issue.title }}"\n\n# GOOD: pass through env\n- run: echo "$ISSUE_TITLE"\n  env:\n    ISSUE_TITLE: ${{ github.event.issue.title }}',
+    compliance: ["SOC2:CC7.1"],
+  },
+  {
+    id: "VG215",
+    name: "GitHub Actions Tag Reference Without SHA Pinning",
+    severity: "high",
+    owasp: "A03:2025 Software Supply Chain Failures",
+    description:
+      "Third-party GitHub Action is referenced by a mutable tag (e.g., @v4) instead of a commit SHA. Tags can be force-pushed to point at malicious code — this is exactly how the tj-actions/changed-files attack (CVE-2025-30066) compromised 23,000+ repositories.",
+    pattern: /uses:\s*(?!actions\/|github\/)[^\s]+@v\d+\s/gi,
+    languages: ["yaml"],
+    fix: "Pin third-party actions to a full commit SHA. Use Dependabot or Renovate to keep SHA pins updated.",
+    fixCode:
+      '# BAD: mutable tag\n- uses: someorg/action@v4\n\n# GOOD: SHA-pinned\n- uses: someorg/action@a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2  # v4',
+    compliance: ["SOC2:CC7.1"],
+  },
+  {
+    id: "VG216",
+    name: "CI Pipeline Executes Untrusted PR Code",
+    severity: "high",
+    owasp: "A01:2025 Broken Access Control",
+    description:
+      "Workflow triggered by pull_request_target runs make, npm test, or other commands from the PR branch. Since pull_request_target has access to secrets but runs untrusted code, attackers can exfiltrate secrets via malicious Makefiles or test scripts (Poisoned Pipeline Execution, OWASP CICD-SEC-4).",
+    pattern: /pull_request_target[\s\S]*?run:\s*(?:make\s|npm\s+(?:test|run)|yarn\s+(?:test|run)|pnpm\s+(?:test|run)|pytest|jest|eslint|cargo\s+test)/gi,
+    languages: ["yaml"],
+    fix: "Use pull_request trigger (no secret access) for testing untrusted code. If pull_request_target is needed, do NOT checkout or run the PR's code.",
+    fixCode:
+      '# Use pull_request for untrusted code\non:\n  pull_request:\n    branches: [main]\nsteps:\n  - uses: actions/checkout@v4\n  - run: npm test  # safe: runs YOUR code, not PR code',
+    compliance: ["SOC2:CC7.1"],
+  },
 ];

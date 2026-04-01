@@ -236,4 +236,46 @@ export const deploymentRules: SecurityRule[] = [
       '# fly.toml\n[[services]]\n  [services.concurrency]\n    hard_limit = 25\n  [[services.ports]]\n    force_https = true\n    port = 80',
     compliance: ["SOC2:CC6.1", "PCI-DSS:Req4.1"],
   },
+  {
+    id: "VG521",
+    name: "Kubernetes Privileged Container",
+    severity: "critical",
+    owasp: "A05:2025 Security Misconfiguration",
+    description:
+      "Kubernetes pod runs with privileged: true, granting full access to the host kernel. This is the #1 container escape vector — a compromised pod can access all host devices, mount the host filesystem, and take over the entire node.",
+    pattern: /securityContext:[\s\S]{0,100}?privileged:\s*true/gi,
+    languages: ["yaml"],
+    fix: "Remove privileged: true. Use specific Linux capabilities if needed instead of full privilege escalation.",
+    fixCode:
+      '# BAD: full host access\n# securityContext:\n#   privileged: true\n\n# GOOD: drop all capabilities, add only what\'s needed\nsecurityContext:\n  privileged: false\n  runAsNonRoot: true\n  capabilities:\n    drop: ["ALL"]',
+    compliance: ["SOC2:CC6.1", "PCI-DSS:Req6.5.10"],
+  },
+  {
+    id: "VG522",
+    name: "Kubernetes Secrets in ConfigMap",
+    severity: "critical",
+    owasp: "A01:2025 Broken Access Control",
+    description:
+      "Sensitive data (passwords, tokens, API keys, credentials) stored in a Kubernetes ConfigMap instead of a Secret. ConfigMaps are not encrypted at rest and are visible to anyone with basic cluster read access.",
+    pattern: /kind:\s*ConfigMap[\s\S]{0,500}?(?:password|secret|token|api[_-]?key|credential|private[_-]?key|database[_-]?url)\s*:\s*\S+/gi,
+    languages: ["yaml"],
+    fix: "Move sensitive data to Kubernetes Secrets with encryption at rest enabled. Never store credentials in ConfigMaps.",
+    fixCode:
+      '# BAD: secret in ConfigMap\n# kind: ConfigMap\n# data:\n#   database-password: "s3cret"\n\n# GOOD: use a Secret\napiVersion: v1\nkind: Secret\nmetadata:\n  name: db-credentials\ntype: Opaque\nstringData:\n  database-password: "s3cret"',
+    compliance: ["SOC2:CC6.1", "PCI-DSS:Req2.3", "HIPAA:§164.312(a)"],
+  },
+  {
+    id: "VG523",
+    name: "Kubernetes Host Namespace Sharing",
+    severity: "critical",
+    owasp: "A05:2025 Security Misconfiguration",
+    description:
+      "Pod uses hostNetwork, hostPID, or hostIPC. This breaks container isolation — the pod can see all host processes, sniff network traffic, and communicate with host-level IPC, enabling trivial container escapes.",
+    pattern: /(?:hostNetwork|hostPID|hostIPC):\s*true/gi,
+    languages: ["yaml"],
+    fix: "Remove hostNetwork, hostPID, and hostIPC unless absolutely required (e.g., CNI plugins). Use NetworkPolicies for inter-pod communication.",
+    fixCode:
+      '# BAD: breaks container isolation\n# hostNetwork: true\n# hostPID: true\n\n# GOOD: use pod networking\nspec:\n  hostNetwork: false\n  hostPID: false\n  hostIPC: false\n  containers:\n    - name: app\n      securityContext:\n        runAsNonRoot: true',
+    compliance: ["SOC2:CC6.1", "PCI-DSS:Req6.5.10"],
+  },
 ];

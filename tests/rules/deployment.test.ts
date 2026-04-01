@@ -39,4 +39,40 @@ describe("Deployment Config Rules", () => {
   it("VG517: detects secret in fly.toml env", () => {
     testRule("VG517", '[env]\nSECRET_KEY = "hardcoded_value"', true);
   });
+
+  describe("VG521 - Kubernetes Privileged Container", () => {
+    it("detects privileged: true in securityContext", () => {
+      testRule("VG521", "securityContext:\n  privileged: true", true);
+    });
+    it("ignores privileged: false", () => {
+      testRule("VG521", "securityContext:\n  privileged: false", false);
+    });
+  });
+
+  describe("VG522 - Kubernetes Secrets in ConfigMap", () => {
+    it("detects password in ConfigMap", () => {
+      testRule("VG522", "kind: ConfigMap\nmetadata:\n  name: app-config\ndata:\n  password: s3cret123", true);
+    });
+    it("detects api-key in ConfigMap", () => {
+      testRule("VG522", "kind: ConfigMap\nmetadata:\n  name: app-config\ndata:\n  api-key: abc123def456", true);
+    });
+    it("ignores ConfigMap with non-sensitive data", () => {
+      testRule("VG522", "kind: ConfigMap\nmetadata:\n  name: app-config\ndata:\n  log-level: info", false);
+    });
+  });
+
+  describe("VG523 - Kubernetes Host Namespace Sharing", () => {
+    it("detects hostNetwork: true", () => {
+      testRule("VG523", "hostNetwork: true", true);
+    });
+    it("detects hostPID: true", () => {
+      testRule("VG523", "hostPID: true", true);
+    });
+    it("detects hostIPC: true", () => {
+      testRule("VG523", "hostIPC: true", true);
+    });
+    it("ignores hostNetwork: false", () => {
+      testRule("VG523", "hostNetwork: false", false);
+    });
+  });
 });

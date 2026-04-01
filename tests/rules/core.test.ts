@@ -111,4 +111,55 @@ describe("Core Rules", () => {
       testRule("VG062", 'const secret = "short"', "javascript", false);
     });
   });
+
+  describe("VG104 - CORS Origin Reflection", () => {
+    it("detects origin header reflection via assignment", () => {
+      testRule("VG104", "Access-Control-Allow-Origin = req.headers.origin", "javascript", true);
+    });
+    it("detects reflecting via req.header('origin')", () => {
+      testRule("VG104", "origin: req.header('origin')", "javascript", true);
+    });
+    it("ignores static origin value", () => {
+      testRule("VG104", "origin: 'https://myapp.com'", "javascript", false);
+    });
+  });
+
+  describe("VG105 - JWT Algorithm None Attack", () => {
+    it("detects jwt.verify without algorithms option", () => {
+      testRule("VG105", "jwt.verify(token, secret)", "javascript", true);
+    });
+    it("detects algorithms with none allowed", () => {
+      testRule("VG105", 'jwt.verify(token, secret, { algorithms: ["none"] })', "javascript", true);
+    });
+    it("ignores jwt.verify with explicit algorithms", () => {
+      testRule("VG105", 'jwt.verify(token, secret, { algorithms: ["HS256"] })', "javascript", false);
+    });
+  });
+
+  describe("VG106 - Timing-Unsafe Secret Comparison", () => {
+    it("detects token === comparison", () => {
+      testRule("VG106", 'if (token === expectedToken)', "javascript", true);
+    });
+    it("detects secret !== comparison", () => {
+      testRule("VG106", 'if (secret !== storedSecret)', "javascript", true);
+    });
+    it("detects apiKey == comparison", () => {
+      testRule("VG106", 'if (apiKey == providedKey)', "javascript", true);
+    });
+    it("ignores non-secret comparison", () => {
+      testRule("VG106", 'if (name === "admin")', "javascript", false);
+    });
+  });
+
+  describe("VG107 - ReDoS via User-Controlled RegExp", () => {
+    it("detects new RegExp with req.query", () => {
+      testRule("VG107", "const re = new RegExp(req.query.search)", "javascript", true);
+    });
+    it("detects new RegExp with userInput", () => {
+      testRule("VG107", "const re = new RegExp(userInput)", "javascript", true);
+    });
+    it("ignores new RegExp with static string", () => {
+      testRule("VG107", 'const re = new RegExp("^[a-z]+$")', "javascript", false);
+    });
+  });
 });

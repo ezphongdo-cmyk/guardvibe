@@ -334,4 +334,52 @@ describe("Modern Stack Security Rules", () => {
       ));
     });
   });
+
+  // =====================================================
+  // GraphQL Batching
+  // =====================================================
+  describe("VG988 - GraphQL Batched Query Abuse", () => {
+    it("detects allowBatchedHttpRequests: true", () => {
+      assert(hasRule(
+        `const server = new ApolloServer({ typeDefs, resolvers, allowBatchedHttpRequests: true });`,
+        "VG988"
+      ));
+    });
+    it("detects batching: true", () => {
+      assert(hasRule(
+        `const config = { batching: true };`,
+        "VG988"
+      ));
+    });
+    it("allows allowBatchedHttpRequests: false", () => {
+      assert(!hasRule(
+        `const server = new ApolloServer({ typeDefs, resolvers, allowBatchedHttpRequests: false });`,
+        "VG988"
+      ));
+    });
+  });
+
+  // =====================================================
+  // Rate Limit Bypass
+  // =====================================================
+  describe("VG989 - Rate Limit Bypass via X-Forwarded-For Trust", () => {
+    it("detects x-forwarded-for header used as rate limit key", () => {
+      assert(hasRule(
+        `const ip = req.headers["x-forwarded-for"];\nconst limiter = rateLimit({ keyGenerator: () => ip });`,
+        "VG989"
+      ));
+    });
+    it("detects req.ip with rate limiter", () => {
+      assert(hasRule(
+        `const key = req.ip;\nconst limiter = rateLimit({ key: key, max: 100 });`,
+        "VG989"
+      ));
+    });
+    it("allows rate limiting without forwarded-for header", () => {
+      assert(!hasRule(
+        `const limiter = rateLimit({ max: 100, windowMs: 15 * 60 * 1000 });`,
+        "VG989"
+      ));
+    });
+  });
 });

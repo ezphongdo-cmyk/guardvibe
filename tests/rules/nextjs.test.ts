@@ -48,4 +48,16 @@ describe("Next.js Rules", () => {
   it("VG411: allows NEXT_PUBLIC_APP_URL", () => {
     testRule("VG411", "NEXT_PUBLIC_APP_URL=https://example.com", false);
   });
+
+  describe("VG413 - Missing serverActions.allowedOrigins", () => {
+    it("detects serverActions config without allowedOrigins", () => {
+      testRule("VG413", 'serverActions: { bodySizeLimit: "2mb" }', true);
+    });
+    it("detects experimental serverActions without allowedOrigins", () => {
+      testRule("VG413", 'experimental: { serverActions: { enabled: true } }', true);
+    });
+    it("ignores serverActions with allowedOrigins", () => {
+      testRule("VG413", 'serverActions: { allowedOrigins: ["myapp.com"] }', false);
+    });
+  });
 });

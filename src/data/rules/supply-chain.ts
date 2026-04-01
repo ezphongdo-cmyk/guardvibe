@@ -88,4 +88,60 @@ export const supplyChainRules: SecurityRule[] = [
       "# .npmignore — exclude sensitive files from npm publish\n*.map\n.env\n.env.*\nsrc/\ntests/\n__tests__/\n*.test.*\n*.spec.*\ntsconfig*.json\n.github/",
     compliance: ["SOC2:CC6.1"],
   },
+  {
+    id: "VG866",
+    name: "Invisible Unicode Characters in Source Code",
+    severity: "critical",
+    owasp: "A02:2025 Injection",
+    description:
+      "Source code contains invisible Unicode characters (zero-width spaces, variation selectors, PUA codepoints). The GlassWorm attack (2025-2026) used these to encode malicious payloads that are invisible in every code editor, compromising 433+ repositories across GitHub, npm, and VSCode.",
+    pattern: /[\u200B\u200C\u200D\uFEFF\u00AD\u2060\u2061\u2062\u2063\u2064\uFE00-\uFE0F]/g,
+    languages: ["javascript", "typescript", "python", "go"],
+    fix: "Remove all invisible Unicode characters from source code. Use a linter rule to prevent them.",
+    fixCode:
+      '// Detect invisible characters with a pre-commit hook:\n// grep -rP "[\\x{200B}\\x{200C}\\x{200D}\\x{FEFF}\\x{00AD}\\x{FE00}-\\x{FE0F}]" src/\n\n// Or add an ESLint rule:\n// "no-irregular-whitespace": "error"',
+    compliance: ["SOC2:CC7.1"],
+  },
+  {
+    id: "VG867",
+    name: "Obfuscated Payload in Install Script",
+    severity: "critical",
+    owasp: "A03:2025 Software Supply Chain Failures",
+    description:
+      "Install script contains Base64 decoding, hex escape sequences, or Buffer.from() — common obfuscation techniques used in npm supply chain attacks (Shai-Hulud, SANDWORM_MODE). Legitimate packages rarely need encoded payloads in lifecycle scripts.",
+    pattern: /["'](?:post|pre)install["']\s*:\s*["'][^"']*(?:Buffer\.from|atob|btoa|\\x[0-9a-f]{2}|fromCharCode|String\.raw|decode\s*\()/gi,
+    languages: ["json"],
+    fix: "Remove obfuscated code from install scripts. Legitimate postinstall scripts should only run build tools like prisma generate or patch-package.",
+    fixCode:
+      '// Safe install scripts:\n"scripts": {\n  "postinstall": "prisma generate"\n}\n\n// DANGEROUS — obfuscated payload:\n// "postinstall": "node -e \\"Buffer.from(\'...payload...\', \'base64\').toString()\\"',
+    compliance: ["SOC2:CC7.1"],
+  },
+  {
+    id: "VG868",
+    name: "Install Script Accesses Credential Files",
+    severity: "critical",
+    owasp: "A01:2025 Broken Access Control",
+    description:
+      "Package install script reads credential files (.npmrc, .ssh, .aws, .env, .git-credentials). The SANDWORM_MODE worm (2026) and Shai-Hulud variants use this technique to steal developer tokens and propagate to other packages.",
+    pattern: /["'](?:post|pre)install["']\s*:\s*["'][^"']*(?:\.npmrc|\.ssh|\.aws|credentials|\.env|\.git-credentials|\.netrc|\.docker\/config)/gi,
+    languages: ["json"],
+    fix: "Remove credential file access from install scripts. No legitimate package needs to read your SSH keys or npm tokens during installation.",
+    fixCode:
+      '// DANGEROUS:\n// "postinstall": "node -e \\"fs.readFileSync(process.env.HOME+\'/.npmrc\')\\"\n\n// Safe: no credential access\n"scripts": {\n  "postinstall": "prisma generate"\n}',
+    compliance: ["SOC2:CC6.1"],
+  },
+  {
+    id: "VG869",
+    name: "Self-Deleting Payload in Package Script",
+    severity: "high",
+    owasp: "A03:2025 Software Supply Chain Failures",
+    description:
+      "Package script deletes its own files after execution (fs.unlinkSync, rm -f on script files). This is a forensic evasion technique used by advanced supply chain malware — the payload runs, then erases evidence of its existence.",
+    pattern: /["'](?:post|pre)install["']\s*:\s*["'][^"']*(?:unlinkSync|rm\s+-[rf]+\s+.*(?:setup|install|hook)|rimraf\s+.*(?:setup|install|hook))/gi,
+    languages: ["json"],
+    fix: "Investigate packages with self-deleting install scripts. This is a strong indicator of malicious intent.",
+    fixCode:
+      '// DANGEROUS — self-deleting payload:\n// "postinstall": "node setup.js && rm -f setup.js"\n\n// Legitimate scripts don\'t delete themselves:\n"scripts": {\n  "postinstall": "patch-package"\n}',
+    compliance: ["SOC2:CC7.1"],
+  },
 ];

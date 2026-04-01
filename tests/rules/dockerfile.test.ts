@@ -21,4 +21,31 @@ describe("Dockerfile Rules", () => {
   it("VG204: detects ADD for local files", () => {
     testRule("VG204", "ADD ./src /app/src", true);
   });
+
+  describe("VG205 - Docker Socket Mount", () => {
+    it("detects -v docker socket mount", () => {
+      testRule("VG205", "-v /var/run/docker.sock:/var/run/docker.sock", true);
+    });
+    it("detects --volume docker socket mount", () => {
+      testRule("VG205", "--volume /var/run/docker.sock:/var/run/docker.sock", true);
+    });
+    it("detects docker-compose volumes socket mount", () => {
+      testRule("VG205", "volumes: /var/run/docker.sock:/var/run/docker.sock", true);
+    });
+    it("ignores normal volume mount", () => {
+      testRule("VG205", "-v /data/app:/app/data", false);
+    });
+  });
+
+  describe("VG206 - Dockerfile Missing HEALTHCHECK", () => {
+    it("detects Dockerfile with CMD but no HEALTHCHECK", () => {
+      testRule("VG206", 'FROM node:20-alpine\nRUN npm install\nCMD ["node", "server.js"]', true);
+    });
+    it("detects Dockerfile with ENTRYPOINT but no HEALTHCHECK", () => {
+      testRule("VG206", 'FROM node:20-alpine\nRUN npm install\nENTRYPOINT ["node", "server.js"]', true);
+    });
+    it("ignores Dockerfile without CMD or ENTRYPOINT", () => {
+      testRule("VG206", "FROM node:20-alpine\nRUN npm install\nEXPOSE 3000", false);
+    });
+  });
 });

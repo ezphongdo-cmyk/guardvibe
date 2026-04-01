@@ -194,4 +194,18 @@ export const nextjsRules: SecurityRule[] = [
       '"use server";\nexport async function getUser(id: string) {\n  return prisma.user.findUnique({\n    where: { id },\n    select: { id: true, name: true, email: true },\n  });\n}',
     compliance: ["SOC2:CC6.1", "HIPAA:§164.312(a)"],
   },
+  {
+    id: "VG413",
+    name: "Next.js Missing serverActions.allowedOrigins",
+    severity: "high",
+    owasp: "A05:2025 Security Misconfiguration",
+    description:
+      "Next.js config uses Server Actions but does not set serverActions.allowedOrigins. Without this, CSRF protection relies only on comparing Origin and Host headers — which can be bypassed behind reverse proxies or CDNs that strip or rewrite the Origin header.",
+    pattern: /(?:experimental\s*:\s*\{[\s\S]*?serverActions\s*:\s*\{|serverActions\s*:\s*\{)(?:(?!allowedOrigins)[\s\S]){5,}?\}/g,
+    languages: ["javascript", "typescript"],
+    fix: "Add serverActions.allowedOrigins to your next.config with your production domain(s).",
+    fixCode:
+      '// next.config.ts\nexport default {\n  serverActions: {\n    allowedOrigins: ["myapp.com", "*.myapp.com"],\n  },\n};',
+    compliance: ["SOC2:CC6.6"],
+  },
 ];

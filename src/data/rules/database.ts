@@ -118,4 +118,18 @@ export const databaseRules: SecurityRule[] = [
       '// Create bucket with auth requirement\nconst { data } = await supabase.storage.createBucket("avatars", {\n  public: false, // require auth\n  fileSizeLimit: 5 * 1024 * 1024, // 5MB\n  allowedMimeTypes: ["image/png", "image/jpeg"],\n});',
     compliance: ["SOC2:CC6.1"],
   },
+  {
+    id: "VG439",
+    name: "Postgres View Without SECURITY INVOKER",
+    severity: "high",
+    owasp: "A01:2025 Broken Access Control",
+    description:
+      "PostgreSQL view is created without security_invoker = true. By default, views execute with the permissions of the view creator (SECURITY DEFINER), bypassing Row Level Security policies. In Supabase and any RLS-dependent system, this silently exposes all rows to any user who can query the view.",
+    pattern: /CREATE\s+(?:OR\s+REPLACE\s+)?VIEW\s+(?:(?!security_invoker\s*=\s*true)[\s\S]){5,}?(?:AS\s+SELECT)/gi,
+    languages: ["sql"],
+    fix: "Add WITH (security_invoker = true) to all views that should respect RLS policies.",
+    fixCode:
+      '-- GOOD: view respects RLS\nCREATE VIEW user_orders\n  WITH (security_invoker = true)\n  AS SELECT * FROM orders;\n\n-- BAD: bypasses RLS\n-- CREATE VIEW user_orders AS SELECT * FROM orders;',
+    compliance: ["SOC2:CC6.1"],
+  },
 ];

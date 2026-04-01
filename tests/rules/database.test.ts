@@ -36,4 +36,16 @@ describe("Database Rules", () => {
   it("VG437: detects service role key in client", () => {
     testRule("VG437", '"use client";\nconst key = process.env.SUPABASE_SERVICE_ROLE_KEY;', true);
   });
+
+  describe("VG439 - Postgres View Without SECURITY INVOKER", () => {
+    it("detects CREATE VIEW without security_invoker", () => {
+      testRule("VG439", "CREATE VIEW user_orders AS SELECT * FROM orders;", true);
+    });
+    it("detects CREATE OR REPLACE VIEW without security_invoker", () => {
+      testRule("VG439", "CREATE OR REPLACE VIEW active_users AS SELECT * FROM users WHERE active = true;", true);
+    });
+    it("ignores view with security_invoker = true", () => {
+      testRule("VG439", "CREATE VIEW user_orders WITH (security_invoker = true) AS SELECT * FROM orders;", false);
+    });
+  });
 });

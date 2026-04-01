@@ -337,4 +337,60 @@ export const coreRules: SecurityRule[] = [
     fixCode: "// Use Object.create(null) for lookups\nconst lookup = Object.create(null);\n// Validate keys\nconst forbidden = ['__proto__', 'constructor', 'prototype'];\nif (forbidden.includes(key)) throw new Error('Invalid key');",
     compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.1"],
   },
+  {
+    id: "VG104",
+    name: "CORS Origin Reflection",
+    severity: "high",
+    owasp: "A05:2025 Security Misconfiguration",
+    description:
+      "The server reflects the request's Origin header back as Access-Control-Allow-Origin. This is worse than a wildcard — combined with credentials:true, it allows any website to make authenticated requests to your API and read responses. Consistently a top HackerOne finding.",
+    pattern: /(?:Access-Control-Allow-Origin|origin)\s*[:=]\s*(?:req\.headers\.origin|req\.header\s*\(\s*['"]origin['"]\)|request\.headers\.get\s*\(\s*['"]origin['"]|event\.headers\.origin)/gi,
+    languages: ["javascript", "typescript"],
+    fix: "Use an explicit allowlist of origins instead of reflecting the request origin.",
+    fixCode:
+      '// Use an allowlist\nconst ALLOWED_ORIGINS = ["https://myapp.com", "https://staging.myapp.com"];\nconst origin = req.headers.origin;\nif (ALLOWED_ORIGINS.includes(origin)) {\n  res.setHeader("Access-Control-Allow-Origin", origin);\n}',
+    compliance: ["SOC2:CC6.6", "PCI-DSS:Req6.5.10"],
+  },
+  {
+    id: "VG105",
+    name: "JWT Algorithm None Attack",
+    severity: "critical",
+    owasp: "A02:2025 Cryptographic Failures",
+    description:
+      "JWT verification does not specify allowed algorithms or explicitly allows 'none'. Attackers can forge tokens by setting alg:none in the header, bypassing signature verification entirely.",
+    pattern: /(?:jwt\.verify|jwtVerify|verifyToken)\s*\(\s*[^,]+,\s*[^,]+(?:\s*\)|\s*,\s*\{(?:(?!algorithms)[\s\S]){0,200}?\})|algorithms\s*:\s*\[\s*['"]none['"]/gi,
+    languages: ["javascript", "typescript"],
+    fix: "Always specify allowed algorithms explicitly in jwt.verify(). Never allow 'none'.",
+    fixCode:
+      '// Always specify algorithms\nconst payload = jwt.verify(token, secret, {\n  algorithms: ["HS256"],  // explicit allowlist\n});\n\n// NEVER: algorithms: ["none"]',
+    compliance: ["SOC2:CC6.1", "PCI-DSS:Req8"],
+  },
+  {
+    id: "VG106",
+    name: "Timing-Unsafe Secret Comparison",
+    severity: "medium",
+    owasp: "A02:2025 Cryptographic Failures",
+    description:
+      "Secret values (tokens, API keys, webhook signatures, HMAC digests) are compared using === or ==. String comparison short-circuits on the first different byte, allowing attackers to guess secrets one character at a time via timing side-channels.",
+    pattern: /(?:secret|token|apiKey|api_key|signature|hmac|hash|webhook|digest)\w*\s*(?:===|!==|==|!=)\s*/gi,
+    languages: ["javascript", "typescript"],
+    fix: "Use crypto.timingSafeEqual() for all secret comparisons.",
+    fixCode:
+      'import { timingSafeEqual } from "crypto";\n\nfunction safeCompare(a: string, b: string): boolean {\n  const bufA = Buffer.from(a);\n  const bufB = Buffer.from(b);\n  if (bufA.length !== bufB.length) return false;\n  return timingSafeEqual(bufA, bufB);\n}',
+    compliance: ["SOC2:CC6.1"],
+  },
+  {
+    id: "VG107",
+    name: "ReDoS via User-Controlled RegExp",
+    severity: "high",
+    owasp: "A04:2023 Unrestricted Resource Consumption",
+    description:
+      "User input is passed directly to new RegExp() constructor. Crafted regex patterns with catastrophic backtracking (e.g., (a+)+$) can freeze the event loop for minutes, causing denial of service.",
+    pattern: /new\s+RegExp\s*\(\s*(?:req\.|request\.|body\.|params\.|query\.|input|userInput|search|filter|pattern|term)/gi,
+    languages: ["javascript", "typescript"],
+    fix: "Never pass user input directly to RegExp. Use string methods (includes, startsWith) or sanitize regex special characters.",
+    fixCode:
+      '// BAD: user controls the regex\nconst re = new RegExp(req.query.search);\n\n// GOOD: escape regex special chars\nfunction escapeRegex(s: string) {\n  return s.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&");\n}\nconst re = new RegExp(escapeRegex(req.query.search));\n\n// BETTER: use string methods\nconst results = items.filter(i => i.name.includes(query));',
+    compliance: ["SOC2:CC7.1"],
+  },
 ];
