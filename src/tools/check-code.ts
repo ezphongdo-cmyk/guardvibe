@@ -187,6 +187,10 @@ export function analyzeCode(
     const rateLimitRuleIds = new Set(["VG956", "VG030"]);
     if (isCronRoute && rateLimitRuleIds.has(rule.id)) continue;
 
+    // Context-aware: skip rate limiting rules for webhook routes
+    // Webhooks are called by external services, not users — rate limiting is irrelevant
+    if (isWebhookRoute && rateLimitRuleIds.has(rule.id)) continue;
+
     // Context-aware: skip rate limiting rules for admin routes that have admin auth
     const isAdminRoute = filePath && /\/admin\//i.test(filePath);
     const hasAdminAuth = isAdminRoute && /(?:requireAdmin|adminOnly|orgRole|org:admin|isAdmin|checkRole|requireRole)/i.test(code);

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createRequire } from "module";
-import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync, unlinkSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, chmodSync, unlinkSync, statSync } from "fs";
 import { join, dirname } from "path";
 import { homedir } from "os";
 
@@ -571,8 +571,8 @@ function printUsage(): void {
   Options:
     --format <type>       Output format: markdown (default), json, sarif
     --output <file>       Write results to file instead of stdout
-    --fail-on <level>     Exit 1 when findings at this level exist
-                          Options: critical (default), high, medium, low, none
+    --fail-on <level>     Exit 1 when findings at this level or above exist
+                          critical (default) | high | medium | low | none
     --baseline <file>     Compare against a previous scan JSON for fix tracking
     --save-baseline       Save current scan as baseline (.guardvibe-baseline.json)
     --version, -V         Print version and exit
@@ -670,7 +670,13 @@ async function main(): Promise<void> {
     const cliArgs = args.slice(1);
     const { flags, positional } = parseArgs(cliArgs);
     const targetPath = positional[0] ?? ".";
-    await runDirectoryScan(targetPath, flags);
+    // If target is a file (not directory), auto-redirect to check mode
+    if (targetPath !== "." && existsSync(targetPath) && !statSync(targetPath).isDirectory()) {
+      console.log(`  [INFO] "${targetPath}" is a file. Running: guardvibe check ${targetPath}\n`);
+      await runFileCheck(targetPath, flags);
+    } else {
+      await runDirectoryScan(targetPath, flags);
+    }
   } else if (command === "diff") {
     const cliArgs = args.slice(1);
     const { flags, positional } = parseArgs(cliArgs);

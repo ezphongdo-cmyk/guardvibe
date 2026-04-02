@@ -143,7 +143,7 @@ export function checkProject(files: FileInput[], format: "markdown" | "json" = "
         const fileCount = item.files.size;
         const fileLabel = fileCount === 1 ? "1 file" : `${fileCount} files`;
         lines.push(
-          `${i + 1}. **[${item.rule.severity.toUpperCase()}] ${item.rule.name}** (${item.rule.id}) — ${item.count} occurrences in ${fileLabel}`,
+          `${i + 1}. **[${item.rule.severity.toUpperCase()}] ${item.rule.name}** (${item.rule.id}) — ${item.count} ${item.count === 1 ? "occurrence" : "occurrences"} in ${fileLabel}`,
           `   ${item.rule.fix}`,
           ``
         );
