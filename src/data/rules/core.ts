@@ -24,7 +24,7 @@ export const coreRules: SecurityRule[] = [
     description:
       "Cloud provider API key or token pattern detected in source code (AWS, GitHub, OpenAI, Stripe).",
     pattern:
-      /(?:AKIA[0-9A-Z]{16}|(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,}|sk-[A-Za-z0-9]{20,}|sk_live_[A-Za-z0-9]{5,}|rk_live_[A-Za-z0-9]{5,})/g,
+      /(?:AKIA[0-9A-Z]{16}|(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,}|sk-(?:proj-)?[A-Za-z0-9\-_]{20,}|sk_live_[A-Za-z0-9]{5,}|rk_live_[A-Za-z0-9]{5,})/g,
     languages: ["javascript", "typescript", "python", "go", "html", "shell"],
     fix: "Remove hardcoded keys immediately. Use environment variables or a secrets manager (AWS Secrets Manager, Vault). Rotate any compromised keys.",
     fixCode: "// Store keys in environment variables\nconst awsKey = process.env.AWS_ACCESS_KEY_ID;\nconst githubToken = process.env.GITHUB_TOKEN;",
@@ -438,5 +438,65 @@ export const coreRules: SecurityRule[] = [
     fixCode:
       '// BAD: user input in event handler\n// `<img onerror="${userInput}">`\n\n// GOOD: use addEventListener\nconst img = document.createElement("img");\nimg.addEventListener("error", () => handleError(sanitizedInput));',
     compliance: ["SOC2:CC7.1"],
+  },
+  {
+    id: "VG111",
+    name: "SSRF via User-Controlled URL",
+    severity: "high",
+    owasp: "A10:2025 Server-Side Request Forgery",
+    description:
+      "User-controlled input is passed directly to fetch(), axios, or http.request() as the URL. Attackers can make the server request internal services (169.254.169.254 for cloud metadata, localhost admin panels, internal APIs) leading to data exfiltration or remote code execution.",
+    pattern:
+      /(?:fetch|axios\.(?:get|post|put|delete|patch|request)|got(?:\.(?:get|post|put|delete|patch))?|request|http\.(?:get|request)|https\.(?:get|request)|urllib\.request\.urlopen)\s*\(\s*(?:url|uri|href|endpoint|target|destination|webhook[Uu]rl|callback[Uu]rl|redirect[Uu]rl|image[Uu]rl|proxy[Uu]rl|api[Uu]rl|base[Uu]rl|link|src|source|remoteUrl|externalUrl|userUrl|inputUrl|requestUrl)\b/gi,
+    languages: ["javascript", "typescript", "python"],
+    fix: "Validate URLs against an allowlist of trusted domains. Block private/internal IP ranges (10.x, 172.16-31.x, 192.168.x, 127.x, 169.254.x, ::1). Use a URL parser to check the hostname before making the request.",
+    fixCode:
+      '// Validate URL before fetching\nconst ALLOWED_HOSTS = ["api.example.com", "cdn.example.com"];\nconst parsed = new URL(userUrl);\nif (!ALLOWED_HOSTS.includes(parsed.hostname)) {\n  throw new Error("Blocked: untrusted host");\n}\n// Also block private IPs\nconst ip = await dns.resolve(parsed.hostname);\nif (isPrivateIP(ip)) throw new Error("Blocked: internal host");\nawait fetch(parsed.href);',
+    compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.1"],
+  },
+  {
+    id: "VG112",
+    name: "XSS via insertAdjacentHTML",
+    severity: "high",
+    owasp: "A02:2025 Injection",
+    description:
+      "insertAdjacentHTML() renders raw HTML strings into the DOM without sanitization, enabling Cross-Site Scripting (XSS). Unlike textContent, this method parses and executes HTML including script tags and event handlers.",
+    pattern:
+      /\.insertAdjacentHTML\s*\(\s*["'](?:beforebegin|afterbegin|beforeend|afterend)["']\s*,/gi,
+    languages: ["javascript", "typescript"],
+    fix: "Use textContent or innerText for plain text. If HTML is needed, sanitize with DOMPurify first.",
+    fixCode:
+      '// BAD: XSS risk\nel.insertAdjacentHTML("beforeend", userInput);\n\n// GOOD: plain text\nel.insertAdjacentText("beforeend", userInput);\n\n// GOOD: sanitized HTML\nimport DOMPurify from "dompurify";\nel.insertAdjacentHTML("beforeend", DOMPurify.sanitize(userInput));',
+    compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.7"],
+  },
+  {
+    id: "VG113",
+    name: "XSS/SSRF via XMLHttpRequest",
+    severity: "high",
+    owasp: "A02:2025 Injection",
+    description:
+      "XMLHttpRequest.open() is called with a user-controlled URL. This can lead to SSRF (server-side) or data exfiltration (client-side) if the URL is not validated.",
+    pattern:
+      /\.open\s*\(\s*["'](?:GET|POST|PUT|DELETE|PATCH)["']\s*,\s*(?:url|uri|href|endpoint|target|userUrl|inputUrl|src)\b/gi,
+    languages: ["javascript", "typescript"],
+    fix: "Validate the URL against an allowlist before passing to XMLHttpRequest.open(). Prefer fetch() with URL validation over raw XHR.",
+    fixCode:
+      '// Validate URL before XHR\nconst allowed = ["https://api.example.com"];\nconst parsed = new URL(userUrl);\nif (!allowed.some(a => userUrl.startsWith(a))) throw new Error("Blocked");\nxhr.open("GET", parsed.href);',
+    compliance: ["SOC2:CC7.1"],
+  },
+  {
+    id: "VG114",
+    name: "SQL Injection via Template Literal",
+    severity: "critical",
+    owasp: "A02:2025 Injection",
+    description:
+      "SQL query constructed using JavaScript template literals with interpolated variables. Template literal SQL is just as dangerous as string concatenation — any user-controlled value can break out of the SQL context and inject arbitrary queries.",
+    pattern:
+      /(?:query|execute|raw|sql|prepare|QueryRow|QueryContext|db\.run|db\.all|db\.get|connection\.query)\s*\(\s*`[^`]*\$\{/gi,
+    languages: ["javascript", "typescript"],
+    fix: "Use parameterized queries. For tagged template literals (e.g. Prisma sql``, Drizzle sql``), the tagged version IS safe — only raw template literals passed to query() are dangerous.",
+    fixCode:
+      '// BAD: template literal SQL\ndb.query(`SELECT * FROM users WHERE id = \'${userId}\'`);\n\n// GOOD: parameterized query\ndb.query("SELECT * FROM users WHERE id = $1", [userId]);\n\n// ALSO SAFE: tagged template literal (Prisma/Drizzle)\nimport { sql } from "drizzle-orm";\ndb.execute(sql`SELECT * FROM users WHERE id = ${userId}`);',
+    compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.1"],
   },
 ];

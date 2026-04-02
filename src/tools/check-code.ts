@@ -193,7 +193,7 @@ export function analyzeCode(
 
     // Context-aware: skip rate limiting rules for admin routes that have admin auth
     const isAdminRoute = filePath && /\/admin\//i.test(filePath);
-    const hasAdminAuth = isAdminRoute && /(?:requireAdmin|adminOnly|orgRole|org:admin|isAdmin|checkRole|requireRole)/i.test(code);
+    const hasAdminAuth = isAdminRoute && /(?:requireAdmin|adminOnly|orgRole|org:admin|isAdmin|checkRole|requireRole|verifyAuth|checkPermission|assertAuth|ensureAuth|authorize)/i.test(code);
     if (hasAdminAuth && rateLimitRuleIds.has(rule.id)) continue;
 
     // Skip npm package rules (VG863/VG864/VG865): only apply to package.json files

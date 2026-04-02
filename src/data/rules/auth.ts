@@ -10,7 +10,7 @@ export const authRules: SecurityRule[] = [
     description:
       "Route handler accesses database without authentication check. Anyone can call this endpoint.",
     pattern:
-      /export\s+(?:async\s+)?function\s+(?:GET|POST|PUT|DELETE|PATCH)\s*\([^)]*\)\s*\{(?:(?!auth\s*\(|getServerSession|currentUser|getUser|requireAuth|requireAdmin|isAuthenticated|verifyToken|checkAuth|protect)[\s\S])*?(?:prisma|db|supabase)\.\w+/g,
+      /export\s+(?:async\s+)?function\s+(?:GET|POST|PUT|DELETE|PATCH)\s*\([^)]*\)\s*\{(?:(?!auth\s*\(|getServerSession|currentUser|getUser|requireAuth|requireAdmin|isAuthenticated|verifyToken|checkAuth|protect|verifyAuth|checkPermission|assertAuth|ensureAuth|guardAuth|validateAuth|authorize|checkSession|verifySession|validateSession|ensureAuthenticated|withAuth)[\s\S])*?(?:prisma|db|supabase)\.\w+/g,
     languages: ["javascript", "typescript"],
     fix: "Add authentication check at the start of every route handler that accesses data.",
     fixCode:
@@ -86,7 +86,7 @@ export const authRules: SecurityRule[] = [
     description:
       "Admin or dashboard route handler does not verify user role or permissions.",
     pattern:
-      /(?:\/admin|\/dashboard)[\s\S]*?export\s+(?:async\s+)?function\s+(?:GET|POST|PUT|DELETE|PATCH|default)\s*\([^)]*\)\s*\{(?:(?!role|permission|isAdmin|orgRole|checkRole|requireAdmin|requireRole|adminOnly)[\s\S])*?\}/g,
+      /(?:\/admin|\/dashboard)[\s\S]*?export\s+(?:async\s+)?function\s+(?:GET|POST|PUT|DELETE|PATCH|default)\s*\([^)]*\)\s*\{(?:(?!role|permission|isAdmin|orgRole|checkRole|requireAdmin|requireRole|adminOnly|verifyAuth|checkPermission|assertAuth|ensureAuth|authorize)[\s\S])*?\}/g,
     languages: ["javascript", "typescript"],
     fix: "Always verify user roles and permissions in admin routes.",
     fixCode:

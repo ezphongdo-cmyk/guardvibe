@@ -39,7 +39,7 @@ export const nextjsRules: SecurityRule[] = [
     description:
       "Server Action performs data mutations without verifying user authentication. Anyone can invoke Server Actions directly via POST request.",
     pattern:
-      /["']use server["'][\s\S]{0,500}?export\s+async\s+function\s+\w+\s*\([^)]*\)\s*\{(?![\s\S]{0,800}?(?:auth\s*\(|getServerSession|currentUser|getUser|requireAuth|clerkClient))/g,
+      /["']use server["'][\s\S]{0,500}?export\s+async\s+function\s+\w+\s*\([^)]*\)\s*\{(?![\s\S]{0,800}?(?:auth\s*\(|getServerSession|currentUser|getUser|requireAuth|requireAdmin|clerkClient|verifyAuth|checkPermission|assertAuth|ensureAuth|authorize|withAuth))/g,
     languages: ["javascript", "typescript"],
     fix: "Always verify authentication at the start of every Server Action.",
     fixCode:
@@ -142,7 +142,7 @@ export const nextjsRules: SecurityRule[] = [
     description:
       "redirect() or NextResponse.redirect() uses user-controlled input (searchParams, query) which can redirect users to malicious sites.",
     pattern:
-      /redirect\s*\(\s*(?:searchParams|params|req\.query|request\.url|url|query)\s*[\.\[]/g,
+      /(?:redirect|NextResponse\.redirect|res\.redirect|Response\.redirect)\s*\(\s*(?:searchParams|params|req\.query|request\.url|url|query|returnTo|callbackUrl|next|goto|returnUrl|redirectUrl|destination)\b/gi,
     languages: ["javascript", "typescript"],
     fix: "Validate redirect URLs against an allowlist of trusted domains.",
     fixCode:

@@ -44,7 +44,7 @@ export const apiSecurityRules: SecurityRule[] = [
     description:
       "Next.js Route Handler that performs data operations without any authentication check. API routes are publicly accessible by default.",
     pattern:
-      /export\s+(?:async\s+)?function\s+(?:GET|POST|PUT|DELETE|PATCH)\s*\([^)]*\)\s*\{(?:(?!auth\s*\(|getServerSession|currentUser|getUser|requireAuth|requireAdmin|requireRole|isAuthenticated|verifyToken|checkAuth|clerkClient|getToken|session|protect|withAuth)[\s\S]){10,}?(?:prisma|db|supabase|query|fetch|sql)\.\w+/g,
+      /export\s+(?:async\s+)?function\s+(?:GET|POST|PUT|DELETE|PATCH)\s*\([^)]*\)\s*\{(?:(?!auth\s*\(|getServerSession|currentUser|getUser|requireAuth|requireAdmin|requireRole|isAuthenticated|verifyToken|checkAuth|clerkClient|getToken|session|protect|withAuth|verifyAuth|checkPermission|assertAuth|ensureAuth|guardAuth|validateAuth|authorize|checkSession|verifySession|validateSession|ensureAuthenticated)[\s\S]){10,}?(?:prisma|db|supabase|query|fetch|sql)\.\w+/g,
     languages: ["javascript", "typescript"],
     fix: "Add authentication at the start of every Route Handler that reads or writes data.",
     fixCode:
@@ -125,7 +125,7 @@ export const apiSecurityRules: SecurityRule[] = [
     description:
       "Endpoint in /admin or /api/admin path performs operations without verifying admin role or permissions. Any authenticated user could access admin functionality.",
     pattern:
-      /(?:\/api\/admin|\/admin)[\s\S]*?export\s+(?:async\s+)?function\s+(?:GET|POST|PUT|DELETE|PATCH)\s*\([^)]*\)\s*\{(?:(?!role|isAdmin|orgRole|permission|requireAdmin|checkRole|adminOnly|org:admin)[\s\S]){10,}?(?:prisma|db|supabase|sql)\.\w+/g,
+      /(?:\/api\/admin|\/admin)[\s\S]*?export\s+(?:async\s+)?function\s+(?:GET|POST|PUT|DELETE|PATCH)\s*\([^)]*\)\s*\{(?:(?!role|isAdmin|orgRole|permission|requireAdmin|checkRole|adminOnly|org:admin|verifyAuth|checkPermission|assertAuth|ensureAuth|authorize)[\s\S]){10,}?(?:prisma|db|supabase|sql)\.\w+/g,
     languages: ["javascript", "typescript"],
     fix: "Always verify admin role/permissions in admin endpoints.",
     fixCode:
