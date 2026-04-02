@@ -62,8 +62,8 @@ function setupPlatform(name: string): boolean {
     }
     if ((existing.mcpServers as Record<string, unknown>)["guardvibe"]) {
       console.log(`  [OK] GuardVibe already configured in ${platform.description}`);
-      // Still ensure CLAUDE.md and .gitignore are set up
-      if (name === "claude") setupClaudeHooksAndGuide();
+      // Still ensure security guidance and .gitignore are set up
+      setupSecurityGuide(name);
       return true;
     }
     (existing.mcpServers as Record<string, unknown>)["guardvibe"] = GUARDVIBE_MCP_CONFIG;
@@ -78,83 +78,120 @@ function setupPlatform(name: string): boolean {
 
   console.log(`  [OK] Added MCP server to ${platform.description}`);
 
-  // For Claude Code: also set up hooks and CLAUDE.md guidance
-  if (name === "claude") {
-    setupClaudeHooksAndGuide();
-  }
+  // Set up platform-specific security guidance + universal security rules
+  setupSecurityGuide(name);
 
   return true;
 }
 
-function setupClaudeHooksAndGuide(): void {
-  // Add hook to .claude/settings.json for auto-scan after file edits
-  const claudeSettingsDir = join(process.cwd(), ".claude");
-  if (!existsSync(claudeSettingsDir)) {
-    mkdirSync(claudeSettingsDir, { recursive: true });
-  }
-  const claudeSettingsPath = join(claudeSettingsDir, "settings.json");
-  const existingSettings = readJsonFile(claudeSettingsPath) || {};
-  if (!existingSettings.hooks) {
-    (existingSettings as any).hooks = {};
-  }
-  // Real security hook: scan edited files automatically after every Edit/Write
-  // Claude Code passes tool_input as JSON on stdin — extract file_path with jq
-  if (!(existingSettings as any).hooks.PostToolUse) {
-    (existingSettings as any).hooks.PostToolUse = [
-      {
-        matcher: "Edit|Write",
-        hooks: [
-          {
-            type: "command",
-            command: "jq -r '.tool_input.file_path' | xargs npx -y guardvibe check --format markdown 2>/dev/null || true"
-          }
-        ]
-      }
-    ];
-  }
+// ── Universal security rules (shared across all AI platforms) ────────
 
-  writeJsonFile(claudeSettingsPath, existingSettings as any);
-  console.log(`  [OK] Claude Code hooks configured (.claude/settings.json)`);
-
-  // Add CLAUDE.md guidance if not present
-  const claudeMdPath = join(process.cwd(), "CLAUDE.md");
-  const guardvibeBlock = `
-## Security Rules (enforced by GuardVibe MCP)
+const SECURITY_RULES = `## Security Rules (enforced by GuardVibe MCP)
 
 ### Mandatory checks
-- BEFORE writing any API route, Server Action, or database query: call \`scan_file\` on the file after editing
-- BEFORE committing: call \`scan_staged\` to catch issues in staged files
+- AFTER writing any API route, Server Action, or database query: use the guardvibe scan_file MCP tool on the file
+- BEFORE committing: use the guardvibe scan_staged MCP tool
 - When GuardVibe reports HIGH or CRITICAL: fix immediately before moving on
+- BEFORE creating a PR: use scan_changed_files to review all changes
 
 ### Writing secure code
 - Every API route handler MUST have auth check before DB access
 - Every POST endpoint MUST have input validation (zod/joi schema)
-- Never pass user input to \`innerHTML\`, \`eval\`, \`exec\`, or raw SQL
-- Never pass user-controlled URLs to \`fetch()\` without allowlist validation
-- Always use \`select:\` in Prisma queries from Server Actions (never return full objects)
+- Never pass user input to innerHTML, eval, exec, or raw SQL
+- Never pass user-controlled URLs to fetch() without allowlist validation
+- Always use select: in Prisma/Drizzle queries from Server Actions (never return full objects to client)
 - Always validate redirect URLs against trusted domain allowlist
-- Set security headers in next.config.ts (CSP, HSTS, X-Frame-Options)
+- Set security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options)
+- Verify webhook signatures before processing events
+- Use parameterized queries, never string concatenation/template literals for SQL
 
 ### When in doubt
-- Use \`explain_remediation\` with the rule ID for detailed fix guidance
-- Use \`scan_changed_files\` with base branch before creating PR
-- Use \`check_code\` to verify a code snippet is secure before applying
+- Use the guardvibe explain_remediation MCP tool with the rule ID for detailed fix guidance
+- Use the guardvibe check_code MCP tool to verify a code snippet is secure before applying
 `;
 
+function setupSecurityGuide(platformName: string): void {
+  // 1. Platform-specific guidance file
+  if (platformName === "claude") setupClaudeGuide();
+  else if (platformName === "cursor") setupCursorGuide();
+  else if (platformName === "gemini") setupGeminiGuide();
+
+  // 2. Platform-specific .gitignore entries
+  const gitignoreEntries: Record<string, string[]> = {
+    claude: [".claude.json", ".claude/", "CLAUDE.md"],
+    cursor: [".cursor/", ".cursorrules"],
+    gemini: ["GEMINI.md"],
+  };
+  const entries = gitignoreEntries[platformName] || [];
+  if (entries.length > 0) addToGitignore(entries);
+}
+
+function setupClaudeGuide(): void {
+  // Claude Code hooks
+  const claudeSettingsDir = join(process.cwd(), ".claude");
+  if (!existsSync(claudeSettingsDir)) mkdirSync(claudeSettingsDir, { recursive: true });
+
+  const claudeSettingsPath = join(claudeSettingsDir, "settings.json");
+  const existingSettings = readJsonFile(claudeSettingsPath) || {};
+  if (!(existingSettings as any).hooks) (existingSettings as any).hooks = {};
+  if (!(existingSettings as any).hooks.PostToolUse) {
+    (existingSettings as any).hooks.PostToolUse = [
+      {
+        matcher: "Edit|Write",
+        hooks: [{
+          type: "command",
+          command: "jq -r '.tool_input.file_path' | xargs npx -y guardvibe check --format markdown 2>/dev/null || true"
+        }]
+      }
+    ];
+  }
+  writeJsonFile(claudeSettingsPath, existingSettings as any);
+  console.log(`  [OK] Claude Code hooks configured (.claude/settings.json)`);
+
+  // CLAUDE.md
+  const claudeMdPath = join(process.cwd(), "CLAUDE.md");
   if (existsSync(claudeMdPath)) {
     const content = readFileSync(claudeMdPath, "utf-8");
     if (!content.includes("GuardVibe")) {
-      writeFileSync(claudeMdPath, content + guardvibeBlock, "utf-8");
-      console.log(`  [OK] GuardVibe guidance added to CLAUDE.md`);
+      writeFileSync(claudeMdPath, content + "\n" + SECURITY_RULES, "utf-8");
+      console.log(`  [OK] GuardVibe rules added to CLAUDE.md`);
     }
   } else {
-    writeFileSync(claudeMdPath, `# Project Guidelines\n${guardvibeBlock}`, "utf-8");
-    console.log(`  [OK] Created CLAUDE.md with GuardVibe guidance`);
+    writeFileSync(claudeMdPath, `# Project Guidelines\n\n${SECURITY_RULES}`, "utf-8");
+    console.log(`  [OK] Created CLAUDE.md with security rules`);
   }
-
-  // Add generated files to .gitignore so they don't get committed
-  addToGitignore([".claude.json", ".claude/", "CLAUDE.md"]);
 }
+
+function setupCursorGuide(): void {
+  // .cursorrules — Cursor reads this file for AI instructions
+  const cursorrules = join(process.cwd(), ".cursorrules");
+  if (existsSync(cursorrules)) {
+    const content = readFileSync(cursorrules, "utf-8");
+    if (!content.includes("GuardVibe")) {
+      writeFileSync(cursorrules, content + "\n" + SECURITY_RULES, "utf-8");
+      console.log(`  [OK] GuardVibe rules added to .cursorrules`);
+    }
+  } else {
+    writeFileSync(cursorrules, SECURITY_RULES, "utf-8");
+    console.log(`  [OK] Created .cursorrules with security rules`);
+  }
+}
+
+function setupGeminiGuide(): void {
+  // GEMINI.md — Gemini CLI reads this for project context
+  const geminiMd = join(process.cwd(), "GEMINI.md");
+  if (existsSync(geminiMd)) {
+    const content = readFileSync(geminiMd, "utf-8");
+    if (!content.includes("GuardVibe")) {
+      writeFileSync(geminiMd, content + "\n" + SECURITY_RULES, "utf-8");
+      console.log(`  [OK] GuardVibe rules added to GEMINI.md`);
+    }
+  } else {
+    writeFileSync(geminiMd, `# Project Guidelines\n\n${SECURITY_RULES}`, "utf-8");
+    console.log(`  [OK] Created GEMINI.md with security rules`);
+  }
+}
+
 
 function addToGitignore(entries: string[]): void {
   const gitignorePath = join(process.cwd(), ".gitignore");
@@ -166,7 +203,7 @@ function addToGitignore(entries: string[]): void {
   const missing = entries.filter(e => !content.split("\n").some(line => line.trim() === e));
   if (missing.length === 0) return;
 
-  const block = `\n# GuardVibe / Claude Code (auto-added by guardvibe init)\n${missing.join("\n")}\n`;
+  const block = `\n# GuardVibe (auto-added by guardvibe init)\n${missing.join("\n")}\n`;
   writeFileSync(gitignorePath, content.trimEnd() + block, "utf-8");
   console.log(`  [OK] Added ${missing.join(", ")} to .gitignore`);
 }
@@ -600,9 +637,9 @@ function printUsage(): void {
     --help, -h            Show this help message
 
   MCP Platforms:
-    claude    Claude Code (.claude.json in project root)
-    gemini    Gemini CLI (~/.gemini/settings.json)
-    cursor    Cursor (.cursor/mcp.json)
+    claude    Claude Code (.claude.json + CLAUDE.md + hooks)
+    cursor    Cursor (.cursor/mcp.json + .cursorrules)
+    gemini    Gemini CLI (~/.gemini/settings.json + GEMINI.md)
     all       All platforms at once
 
   Supported File Types:
