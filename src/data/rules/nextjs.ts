@@ -222,4 +222,34 @@ export const nextjsRules: SecurityRule[] = [
       '<!-- EJS: use escaped output -->\n<p><%= userInput %></p>   <!-- SAFE: HTML-escaped -->\n<!-- NOT: <%- userInput %>  DANGEROUS: raw HTML -->\n\n<!-- Handlebars: use double braces -->\n<p>{{userInput}}</p>      <!-- SAFE: escaped -->\n<!-- NOT: {{{userInput}}}   DANGEROUS: raw HTML -->\n\n<!-- Pug: use = not != -->\np= userInput              //- SAFE: escaped\n//- NOT: p!= userInput    DANGEROUS: raw HTML',
     compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.1"],
   },
+  {
+    id: "VG415",
+    name: "Cached Function Exposes User-Specific Data",
+    severity: "high",
+    owasp: "A01:2025 Broken Access Control",
+    description:
+      "A function marked with 'use cache' accesses user-specific data (auth, session, cookies, headers) but caches the result. Cached data is shared across all users, leaking one user's data to others.",
+    pattern:
+      /["']use cache["'][\s\S]{0,800}?(?:auth\s*\(|getServerSession|currentUser|getUser|cookies\s*\(|headers\s*\()/g,
+    languages: ["javascript", "typescript"],
+    fix: "Do not access user-specific data inside cached functions. Pass user-independent parameters only, or use cacheTag with user-specific tags.",
+    fixCode:
+      '// BAD: caches user-specific data\n"use cache";\nasync function getData() {\n  const { userId } = await auth(); // WRONG in cached fn!\n  return db.items.findMany({ where: { userId } });\n}\n\n// GOOD: cache only shared data\n"use cache";\nasync function getPublicPosts() {\n  return db.posts.findMany({ where: { published: true } });\n}',
+    compliance: ["SOC2:CC6.1"],
+  },
+  {
+    id: "VG416",
+    name: "Cached Function Without Revalidation Strategy",
+    severity: "medium",
+    owasp: "A05:2025 Security Misconfiguration",
+    description:
+      "A function marked with 'use cache' does not specify a cacheLife or cacheTag for revalidation. Without explicit revalidation, stale data may be served indefinitely, including outdated security-sensitive information.",
+    pattern:
+      /["']use cache["'](?:(?!cacheLife|cacheTag|unstable_cache)[\s\S]){10,}?(?:return|export)/g,
+    languages: ["javascript", "typescript"],
+    fix: "Add cacheLife() or cacheTag() inside cached functions to control revalidation.",
+    fixCode:
+      '"use cache";\nimport { cacheLife, cacheTag } from "next/cache";\n\nasync function getCachedData() {\n  cacheLife("hours");\n  cacheTag("data-feed");\n  return db.posts.findMany();\n}\n\n// Revalidate when data changes:\nimport { revalidateTag } from "next/cache";\nrevalidateTag("data-feed");',
+    compliance: ["SOC2:CC7.1"],
+  },
 ];

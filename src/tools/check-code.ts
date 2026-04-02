@@ -64,22 +64,36 @@ function isInComment(lines: string[], lineNumber: number): boolean {
 function isInsideStringLiteral(lines: string[], lineNumber: number, code: string, matchIndex: number): boolean {
   const line = lines[lineNumber - 1];
   if (!line) return false;
-  const trimmed = line.trimStart();
 
-  // Line is part of a template literal or multi-line string
-  // Check if we're between backticks by counting unescaped backticks before this point
+  // 1. Template literal: count unescaped backticks before this point
   const before = code.substring(0, matchIndex);
   const backtickCount = (before.match(/(?<!\\)`/g) || []).length;
-  if (backtickCount % 2 === 1) return true; // inside template literal
+  if (backtickCount % 2 === 1) return true;
 
-  // Line is a string property value (fixCode, description, fix, exploit, audit, fixCode)
-  // Look backwards to find if this line is inside a property assignment string
+  // 2. The match line itself is a string continuation (starts with quote + or ends with +quote)
+  const trimmed = line.trimStart();
+  if (/^["']/.test(trimmed) && /\+\s*$/.test(line)) return true; // "string" +
+  if (/^\s*\+\s*["']/.test(line)) return true; // + "string continuation"
+
+  // 3. Line contains escaped newlines (\n) suggesting it's inside a string value
+  const quotesBefore = line.substring(0, line.indexOf(trimmed.charAt(0)));
+  if (/\\n/.test(line) && /["'`].*\\n/.test(line)) {
+    // Extra check: is the match portion inside quotes on this line?
+    const matchEnd = matchIndex + 20; // approximate
+    const lineStart = code.lastIndexOf("\n", matchIndex) + 1;
+    const col = matchIndex - lineStart;
+    const beforeCol = line.substring(0, col);
+    const singleQuotes = (beforeCol.match(/(?<!\\)'/g) || []).length;
+    const doubleQuotes = (beforeCol.match(/(?<!\\)"/g) || []).length;
+    if (singleQuotes % 2 === 1 || doubleQuotes % 2 === 1) return true;
+  }
+
+  // 4. Look backwards for property assignment context (fixCode, description, etc.)
   for (let i = lineNumber - 1; i >= Math.max(0, lineNumber - 20); i--) {
     const prev = lines[i]?.trimStart() || "";
-    // Property assignment with string value that likely spans lines
-    if (/^(?:fixCode|fix|description|exploit|audit|fixCode)\s*[:=]/.test(prev)) return true;
+    if (/^(?:fixCode|fix|description|exploit|audit)\s*[:=]/.test(prev)) return true;
     if (/^(?:fixCode|fix|description|exploit|audit)\s*:\s*$/.test(prev)) return true;
-    // Hit a rule boundary (id: "VG...) — stop looking
+    // Hit a rule boundary — stop looking
     if (/^\s*id\s*:\s*["']VG/.test(prev)) break;
     if (/^\s*\{/.test(prev) && i < lineNumber - 2) break;
   }
@@ -107,6 +121,27 @@ function isHumanReadableString(lines: string[], lineNumber: number): boolean {
   return false;
 }
 
+/**
+ * Detect if a file is a security rule definition file.
+ * These files intentionally contain vulnerable code patterns
+ * as regex matchers and fixCode examples — scanning them is meaningless.
+ */
+function isRuleDefinitionFile(code: string, filePath?: string): boolean {
+  // Path-based: known rule definition directories
+  if (filePath && /(?:\/rules\/|\/data\/rules\/)/.test(filePath)) {
+    // Confirm it actually exports SecurityRule objects
+    if (/SecurityRule\s*\[\]/.test(code) && /id:\s*["']VG\d+["']/.test(code)) {
+      return true;
+    }
+  }
+  // Content-based: file defines multiple VG rules with pattern: regex
+  if (/id:\s*["']VG\d+["']/g.test(code) && /pattern:\s*\//.test(code)) {
+    const ruleCount = (code.match(/id:\s*["']VG\d+["']/g) || []).length;
+    if (ruleCount >= 3) return true; // 3+ rule definitions = rule file
+  }
+  return false;
+}
+
 export function analyzeCode(
   code: string,
   language: string,
@@ -115,6 +150,10 @@ export function analyzeCode(
   configDir?: string,
   rules?: SecurityRule[]
 ): Finding[] {
+  // Skip files that are security rule definitions (they intentionally contain
+  // vulnerable code patterns as regex matchers and fixCode examples)
+  if (isRuleDefinitionFile(code, filePath)) return [];
+
   const config = loadConfig(configDir);
   const ignoreEntries = loadIgnoreFile(configDir || process.cwd());
   const findings: Finding[] = [];
