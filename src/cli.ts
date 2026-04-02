@@ -98,7 +98,7 @@ function setupClaudeHooksAndGuide(): void {
     (existingSettings as any).hooks = {};
   }
   // Real security hook: scan edited files automatically after every Edit/Write
-  // This makes GuardVibe an active guardian, not a passive tool
+  // Claude Code passes tool_input as JSON on stdin — extract file_path with jq
   if (!(existingSettings as any).hooks.PostToolUse) {
     (existingSettings as any).hooks.PostToolUse = [
       {
@@ -106,7 +106,7 @@ function setupClaudeHooksAndGuide(): void {
         hooks: [
           {
             type: "command",
-            command: "npx -y guardvibe check $CLAUDE_FILE_PATH --format markdown 2>/dev/null || true"
+            command: "jq -r '.tool_input.file_path' | xargs npx -y guardvibe check --format markdown 2>/dev/null || true"
           }
         ]
       }
