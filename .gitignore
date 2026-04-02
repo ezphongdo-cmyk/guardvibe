@@ -9,3 +9,11 @@ build/
 SESSION-HANDOFF.md
 docs/superpowers/
 tests/qa/
+# GuardVibe (auto-added by guardvibe init)
+.claude.json
+CLAUDE.md
+# GuardVibe (auto-added by guardvibe init)
+GEMINI.md
+# GuardVibe (auto-added by guardvibe init)
+.cursor/
+.cursorrules

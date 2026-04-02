@@ -440,7 +440,7 @@ export const coreRules: SecurityRule[] = [
     compliance: ["SOC2:CC7.1"],
   },
   {
-    id: "VG111",
+    id: "VG120",
     name: "SSRF via User-Controlled URL",
     severity: "high",
     owasp: "A10:2025 Server-Side Request Forgery",
@@ -455,7 +455,7 @@ export const coreRules: SecurityRule[] = [
     compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.1"],
   },
   {
-    id: "VG112",
+    id: "VG121",
     name: "XSS via insertAdjacentHTML",
     severity: "high",
     owasp: "A02:2025 Injection",
@@ -470,7 +470,7 @@ export const coreRules: SecurityRule[] = [
     compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.7"],
   },
   {
-    id: "VG113",
+    id: "VG122",
     name: "XSS/SSRF via XMLHttpRequest",
     severity: "high",
     owasp: "A02:2025 Injection",
@@ -485,7 +485,7 @@ export const coreRules: SecurityRule[] = [
     compliance: ["SOC2:CC7.1"],
   },
   {
-    id: "VG114",
+    id: "VG123",
     name: "SQL Injection via Template Literal",
     severity: "critical",
     owasp: "A02:2025 Injection",
@@ -498,5 +498,35 @@ export const coreRules: SecurityRule[] = [
     fixCode:
       '// BAD: template literal SQL\ndb.query(`SELECT * FROM users WHERE id = \'${userId}\'`);\n\n// GOOD: parameterized query\ndb.query("SELECT * FROM users WHERE id = $1", [userId]);\n\n// ALSO SAFE: tagged template literal (Prisma/Drizzle)\nimport { sql } from "drizzle-orm";\ndb.execute(sql`SELECT * FROM users WHERE id = ${userId}`);',
     compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.1"],
+  },
+  {
+    id: "VG124",
+    name: "Insecure Random for Security Token",
+    severity: "high",
+    owasp: "A02:2025 Cryptographic Failures",
+    description:
+      "Math.random() is used to generate tokens, IDs, codes, or nonces. Math.random() is not cryptographically secure — its output is predictable, allowing attackers to guess reset tokens, session IDs, verification codes, or API keys.",
+    pattern:
+      /(?:(?:token|secret|key|code|nonce|session|reset|verify|otp|password|auth|invite|magic|csrf)\w*\s*=[\s\S]{0,30}?Math\.random|Math\.random\s*\(\s*\)[\s\S]{0,50}?(?:token|secret|key|code|nonce|session|reset|verify|otp|password|auth|invite|magic|csrf))/gi,
+    languages: ["javascript", "typescript"],
+    fix: "Use crypto.randomUUID() or crypto.randomBytes() for security-sensitive random values.",
+    fixCode:
+      '// BAD: predictable\nconst token = Math.random().toString(36);\n\n// GOOD: cryptographically secure\nimport { randomUUID, randomBytes } from "crypto";\nconst token = randomUUID();\nconst resetCode = randomBytes(32).toString("hex");\n// Or in browser:\nconst token = crypto.randomUUID();',
+    compliance: ["SOC2:CC6.1", "PCI-DSS:Req6.5.3"],
+  },
+  {
+    id: "VG125",
+    name: "Session Not Regenerated After Authentication",
+    severity: "high",
+    owasp: "A07:2025 Identification and Authentication Failures",
+    description:
+      "User session is not regenerated after login/authentication. This enables session fixation attacks — an attacker can set a known session ID before the user logs in, then hijack their authenticated session.",
+    pattern:
+      /(?:login|signIn|authenticate|logIn)\s*(?:=\s*async|\([\s\S]*?\)\s*(?:=>|{))[\s\S]{0,500}?(?:req\.session\.\w+\s*=)(?:(?!regenerate|destroy|create|rotate)[\s\S]){0,300}?(?:res\.|return|next\()/gi,
+    languages: ["javascript", "typescript"],
+    fix: "Regenerate the session after successful authentication. In Express: req.session.regenerate(). In Next.js: use a new session token.",
+    fixCode:
+      '// Express: regenerate session after login\napp.post("/login", async (req, res) => {\n  const user = await authenticate(req.body);\n  if (!user) return res.status(401).json({ error: "Invalid credentials" });\n  req.session.regenerate((err) => {\n    req.session.userId = user.id;\n    res.json({ ok: true });\n  });\n});',
+    compliance: ["SOC2:CC6.6", "PCI-DSS:Req6.5.10"],
   },
 ];
