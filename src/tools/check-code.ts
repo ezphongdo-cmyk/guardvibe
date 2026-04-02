@@ -102,6 +102,16 @@ export function analyzeCode(
 
     // Skip npm package rules (VG863/VG864/VG865): only apply to package.json files
     if ((rule.id === "VG863" || rule.id === "VG864" || rule.id === "VG865") && filePath && !filePath.endsWith("package.json")) continue;
+
+    // Skip React Native/mobile-only rules (VG70x) in web projects:
+    // only apply when framework is react-native/expo or path suggests mobile
+    const mobileRuleIds = new Set(["VG705", "VG706", "VG707", "VG709"]);
+    if (mobileRuleIds.has(rule.id)) {
+      const isMobileContext = framework === "react-native" || framework === "expo" ||
+        (filePath && /(?:react.native|expo|\.native\.|android|ios)/i.test(filePath));
+      if (!isMobileContext) continue;
+    }
+
     rule.pattern.lastIndex = 0;
 
     // Apply severity override from config
