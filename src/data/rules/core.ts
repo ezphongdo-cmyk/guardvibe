@@ -92,7 +92,7 @@ export const coreRules: SecurityRule[] = [
     owasp: "A02:2025 Injection",
     description:
       "Setting innerHTML with dynamic content enables Cross-Site Scripting (XSS) attacks.",
-    pattern: /(?:innerHTML|outerHTML|dangerouslySetInnerHTML)\s*(?:=|:)\s*(?!['"]<)/gi,
+    pattern: /(?:innerHTML|outerHTML)\s*(?:=|:)\s*(?!['"]<)/gi,
     languages: ["javascript", "typescript", "html"],
     fix: "Use textContent instead of innerHTML. Sanitize with DOMPurify if HTML rendering is needed. In React, avoid dangerouslySetInnerHTML.",
     // fixCode: added via concatenation to avoid false-positive hook trigger on DOMPurify example

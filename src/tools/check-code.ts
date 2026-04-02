@@ -1,5 +1,6 @@
 import { owaspRules, type SecurityRule } from "../data/rules/index.js";
 import { loadConfig } from "../utils/config.js";
+import { loadIgnoreFile, isIgnored } from "../utils/ignore.js";
 
 export interface Finding {
   rule: SecurityRule;
@@ -83,6 +84,7 @@ export function analyzeCode(
   rules?: SecurityRule[]
 ): Finding[] {
   const config = loadConfig(configDir);
+  const ignoreEntries = loadIgnoreFile(configDir || process.cwd());
   const findings: Finding[] = [];
   const lines = code.split("\n");
   const suppressions = parseSuppressionsFromCode(lines);
@@ -95,10 +97,29 @@ export function analyzeCode(
     // Config: skip disabled rules
     if (config.rules.disable.includes(rule.id)) continue;
 
+    // .guardvibeignore: skip rules for matching file patterns
+    if (isIgnored(ignoreEntries, rule.id, filePath)) continue;
+
     // Skip CI/CD rules: when filePath is given, require .github/workflows path.
     // When no filePath (MCP call), allow if language is yaml.
     if (rule.id.startsWith("VG21") && filePath && !filePath.includes(".github/workflows")) continue;
     if (rule.id.startsWith("VG21") && !filePath && language !== "yaml") continue;
+
+    // Context-aware: skip auth rules for webhook routes that have signature verification
+    const isWebhookRoute = filePath && /webhook/i.test(filePath);
+    const hasSignatureVerification = isWebhookRoute && /(?:verify|signature|hmac|constructEvent|svix|webhookSecret|createHmac|X-Signature|stripe-signature)/i.test(code);
+    const authRuleIds = new Set(["VG420", "VG952", "VG002"]);
+    if (hasSignatureVerification && authRuleIds.has(rule.id)) continue;
+
+    // Context-aware: skip rate limiting rules for cron/scheduled routes
+    const isCronRoute = filePath && /(?:cron|scheduled|jobs?)\//i.test(filePath);
+    const rateLimitRuleIds = new Set(["VG956", "VG030"]);
+    if (isCronRoute && rateLimitRuleIds.has(rule.id)) continue;
+
+    // Context-aware: skip rate limiting rules for admin routes that have admin auth
+    const isAdminRoute = filePath && /\/admin\//i.test(filePath);
+    const hasAdminAuth = isAdminRoute && /(?:requireAdmin|adminOnly|orgRole|org:admin|isAdmin|checkRole|requireRole)/i.test(code);
+    if (hasAdminAuth && rateLimitRuleIds.has(rule.id)) continue;
 
     // Skip npm package rules (VG863/VG864/VG865): only apply to package.json files
     if ((rule.id === "VG863" || rule.id === "VG864" || rule.id === "VG865") && filePath && !filePath.endsWith("package.json")) continue;
@@ -122,9 +143,26 @@ export function analyzeCode(
     rule.pattern.lastIndex = 0;
 
     // Apply severity override from config
-    const effectiveRule = config.rules.severity[rule.id]
+    let effectiveRule = config.rules.severity[rule.id]
       ? { ...rule, severity: config.rules.severity[rule.id] as any }
       : rule;
+
+    // Context-aware severity: downgrade rate limiting/pagination issues in admin routes
+    // Admin routes behind requireAdmin have lower brute-force risk
+    if (isAdminRoute && hasAdminAuth) {
+      const downgradeInAdmin = new Set(["VG955"]); // pagination in admin is less critical
+      if (downgradeInAdmin.has(rule.id) && effectiveRule.severity === "medium") {
+        effectiveRule = { ...effectiveRule, severity: "low" as const };
+      }
+    }
+
+    // Context-aware severity: downgrade auth warnings in internal/cron routes
+    if (isCronRoute) {
+      const downgradeInCron = new Set(["VG420", "VG952"]); // cron routes don't need user auth
+      if (downgradeInCron.has(rule.id)) {
+        effectiveRule = { ...effectiveRule, severity: "low" as const };
+      }
+    }
 
     let match: RegExpExecArray | null;
     while ((match = rule.pattern.exec(code)) !== null) {
@@ -152,7 +190,77 @@ export function analyzeCode(
     }
   }
 
-  return findings;
+  // Deduplicate: if two rules match the same line, keep the more specific one.
+  // More specific = longer rule ID prefix match (e.g. VG408 nextjs > VG012 core)
+  // or framework-specific rule > generic rule on the same line.
+  const deduped = deduplicateFindings(findings);
+
+  return deduped;
+}
+
+/**
+ * Remove duplicate findings where two rules flag the same line for the same issue.
+ * Prefers framework-specific rules (VG4xx, VG9xx) over generic core rules (VG0xx).
+ */
+function deduplicateFindings(findings: Finding[]): Finding[] {
+  // Group findings by line number
+  const byLine = new Map<number, Finding[]>();
+  for (const f of findings) {
+    const group = byLine.get(f.line);
+    if (group) group.push(f);
+    else byLine.set(f.line, [f]);
+  }
+
+  const result: Finding[] = [];
+  for (const group of byLine.values()) {
+    if (group.length <= 1) {
+      result.push(...group);
+      continue;
+    }
+
+    // Check for overlapping rules on the same line
+    const kept = new Set<number>();
+    for (let i = 0; i < group.length; i++) {
+      let dominated = false;
+      for (let j = 0; j < group.length; j++) {
+        if (i === j) continue;
+        if (isDuplicatePair(group[i], group[j])) {
+          // Keep the more specific rule (higher rule ID prefix = more specific)
+          if (isMoreSpecific(group[j], group[i])) {
+            dominated = true;
+            break;
+          }
+        }
+      }
+      if (!dominated) kept.add(i);
+    }
+    for (const idx of kept) result.push(group[idx]);
+  }
+
+  return result;
+}
+
+/** Check if two findings on the same line are duplicates (same vulnerability class). */
+function isDuplicatePair(a: Finding, b: Finding): boolean {
+  // Same rule name = same vulnerability
+  if (a.rule.name === b.rule.name) return true;
+  // Both are XSS/innerHTML related — the core VG012+VG408 duplicate case
+  if (a.rule.name.includes("innerHTML") && b.rule.name.includes("innerHTML")) return true;
+  if (a.rule.name.includes("XSS via innerHTML") && b.rule.name.includes("Unsafe innerHTML")) return true;
+  if (a.rule.name.includes("Unsafe innerHTML") && b.rule.name.includes("XSS via innerHTML")) return true;
+  return false;
+}
+
+/** Check if rule A is more specific than rule B (framework rules > core rules). */
+function isMoreSpecific(a: Finding, b: Finding): boolean {
+  const prefixOrder = (id: string): number => {
+    const num = parseInt(id.replace("VG", ""), 10);
+    if (num >= 400 && num < 500) return 3; // nextjs-specific
+    if (num >= 900) return 2; // api-security / cve
+    if (num >= 100) return 1; // category-specific
+    return 0; // core rules VG0xx
+  };
+  return prefixOrder(a.rule.id) > prefixOrder(b.rule.id);
 }
 
 export function formatFindingsJson(findings: Finding[], extra?: Record<string, unknown>): string {

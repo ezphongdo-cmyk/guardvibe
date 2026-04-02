@@ -57,9 +57,10 @@ function detectLanguage(filePath: string): string | null {
 }
 
 function calculateScore(critical: number, high: number, medium: number, fileCount: number = 1): number {
-  const weighted = critical * 10 + high * 3 + medium * 1;
+  // Calibrated: medium issues are informational (0.5 weight), high issues are real (5x), critical are severe (15x)
+  const weighted = critical * 15 + high * 5 + medium * 0.5;
   const density = weighted / Math.max(fileCount, 1);
-  return Math.max(0, Math.min(100, Math.round(100 - density * 20)));
+  return Math.max(0, Math.min(100, Math.round(100 - Math.min(density, 5) * 20)));
 }
 
 function scoreToGrade(score: number): string {
@@ -117,24 +118,36 @@ export function checkProject(files: FileInput[], format: "markdown" | "json" = "
     if (totalMedium > 0) lines.push(`| Medium   | ${totalMedium}     |`);
     lines.push(``);
 
-    // Top issues sorted by severity
+    // Top 5 Action Items — grouped by rule, sorted by severity, with file counts
     const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
-    const allIssues = results.flatMap((r) =>
-      r.findings.map((f) => ({
-        severity: f.rule.severity,
-        order: severityOrder[f.rule.severity] ?? 99,
-        text: `[${f.rule.severity.toUpperCase()}] ${f.rule.name} in ${r.path} (${f.rule.id})`,
-      }))
-    );
-    allIssues.sort((a, b) => a.order - b.order);
+    const ruleGroups = new Map<string, { rule: typeof allFindings[0]["rule"]; files: Set<string>; count: number }>();
+    for (const r of results) {
+      for (const f of r.findings) {
+        const existing = ruleGroups.get(f.rule.id);
+        if (existing) {
+          existing.files.add(r.path);
+          existing.count++;
+        } else {
+          ruleGroups.set(f.rule.id, { rule: f.rule, files: new Set([r.path]), count: 1 });
+        }
+      }
+    }
 
-    if (allIssues.length > 0) {
-      lines.push(`## Top Issues`);
-      const topN = allIssues.slice(0, 10);
-      topN.forEach((issue, i) => {
-        lines.push(`${i + 1}. ${issue.text}`);
+    const actionItems = Array.from(ruleGroups.values())
+      .sort((a, b) => (severityOrder[a.rule.severity] ?? 99) - (severityOrder[b.rule.severity] ?? 99))
+      .slice(0, 5);
+
+    if (actionItems.length > 0) {
+      lines.push(`## Top 5 Action Items`, ``);
+      actionItems.forEach((item, i) => {
+        const fileCount = item.files.size;
+        const fileLabel = fileCount === 1 ? "1 file" : `${fileCount} files`;
+        lines.push(
+          `${i + 1}. **[${item.rule.severity.toUpperCase()}] ${item.rule.name}** (${item.rule.id}) — ${item.count} occurrences in ${fileLabel}`,
+          `   ${item.rule.fix}`,
+          ``
+        );
       });
-      lines.push(``);
     }
 
     lines.push(`---`, ``);

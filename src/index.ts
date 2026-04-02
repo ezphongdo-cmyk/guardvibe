@@ -4,7 +4,7 @@ import { createRequire } from "module";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { checkCode } from "./tools/check-code.js";
+import { checkCode, analyzeCode } from "./tools/check-code.js";
 
 const require = createRequire(import.meta.url);
 const pkg = require("../package.json") as { version: string };
@@ -428,6 +428,122 @@ server.tool(
     const rules = getRules();
     const results = explainRemediation(rule_id, code, format, rules);
     return { content: [{ type: "text", text: results }] };
+  }
+);
+
+// Tool 23: Quick file scan — designed for real-time integration
+server.tool(
+  "scan_file",
+  "Scan a single file from disk for security vulnerabilities. Returns only findings (no boilerplate). Designed for real-time use: call this after editing a file to catch security issues immediately. Lightweight and fast — reads the file, detects language, and returns findings in JSON.",
+  {
+    file_path: z.string().describe("Absolute or relative path to the file to scan"),
+    format: z.enum(["markdown", "json"]).default("json").describe("Output format"),
+  },
+  async ({ file_path, format }) => {
+    const { readFileSync, existsSync } = await import("fs");
+    const { resolve, extname, basename, dirname } = await import("path");
+
+    const resolved = resolve(file_path);
+    if (!existsSync(resolved)) {
+      return { content: [{ type: "text", text: JSON.stringify({ error: `File not found: ${resolved}` }) }] };
+    }
+
+    const content = readFileSync(resolved, "utf-8");
+    const ext = extname(resolved).toLowerCase();
+    const { EXTENSION_MAP, CONFIG_FILE_MAP } = await import("./utils/constants.js");
+
+    let language = EXTENSION_MAP[ext];
+    if (!language && basename(resolved).startsWith("Dockerfile")) language = "dockerfile";
+    if (!language) language = CONFIG_FILE_MAP[basename(resolved)];
+    if (!language) {
+      return { content: [{ type: "text", text: format === "json" ? JSON.stringify({ summary: { total: 0 }, findings: [] }) : "Unsupported file type." }] };
+    }
+
+    const rules = getRules();
+    const result = checkCode(content, language, undefined, resolved, dirname(resolved), format, rules);
+    return { content: [{ type: "text", text: result }] };
+  }
+);
+
+// Tool 24: Scan changed files only — for incremental CI/CD and PR workflows
+server.tool(
+  "scan_changed_files",
+  "Scan only files that have changed since a given git ref (branch, commit, or HEAD~N). Ideal for PR checks, pre-push hooks, and incremental CI. Returns findings only for modified/added files.",
+  {
+    path: z.string().default(".").describe("Repository root path"),
+    base: z.string().default("HEAD~1").describe("Git ref to diff against (e.g. 'main', 'HEAD~3', commit SHA)"),
+    format: z.enum(["markdown", "json"]).default("markdown").describe("Output format"),
+  },
+  async ({ path: repoPath, base, format }) => {
+    const { execFileSync } = await import("child_process");
+    const { readFileSync, existsSync } = await import("fs");
+    const { resolve, extname, basename } = await import("path");
+    const { EXTENSION_MAP, CONFIG_FILE_MAP } = await import("./utils/constants.js");
+
+    const root = resolve(repoPath);
+    let changedFiles: string[];
+    try {
+      const output = execFileSync("git", ["diff", "--name-only", "--diff-filter=ACMR", base], { cwd: root, encoding: "utf-8" });
+      changedFiles = output.trim().split("\n").filter(Boolean);
+    } catch {
+      return { content: [{ type: "text", text: format === "json" ? JSON.stringify({ error: "Failed to get git diff" }) : "Error: Failed to get git diff. Ensure you're in a git repository." }] };
+    }
+
+    if (changedFiles.length === 0) {
+      const empty = format === "json"
+        ? JSON.stringify({ summary: { total: 0, critical: 0, high: 0, medium: 0, low: 0, blocked: false }, findings: [] })
+        : "No changed files to scan.";
+      return { content: [{ type: "text", text: empty }] };
+    }
+
+    const rules = getRules();
+    const allFindings: Array<{ file: string; id: string; name: string; severity: string; owasp: string; line: number; match: string; fix: string; fixCode?: string }> = [];
+
+    for (const relPath of changedFiles) {
+      const fullPath = resolve(root, relPath);
+      if (!existsSync(fullPath)) continue;
+
+      const ext = extname(relPath).toLowerCase();
+      let language = EXTENSION_MAP[ext];
+      if (!language && basename(relPath).startsWith("Dockerfile")) language = "dockerfile";
+      if (!language) language = CONFIG_FILE_MAP[basename(relPath)];
+      if (!language) continue;
+
+      try {
+        const content = readFileSync(fullPath, "utf-8");
+        const findings = analyzeCode(content, language, undefined, fullPath, root, rules);
+        for (const f of findings) {
+          allFindings.push({
+            file: relPath, id: f.rule.id, name: f.rule.name,
+            severity: f.rule.severity, owasp: f.rule.owasp,
+            line: f.line, match: f.match, fix: f.rule.fix, fixCode: f.rule.fixCode,
+          });
+        }
+      } catch { /* skip unreadable files */ }
+    }
+
+    if (format === "json") {
+      const critical = allFindings.filter(f => f.severity === "critical").length;
+      const high = allFindings.filter(f => f.severity === "high").length;
+      const medium = allFindings.filter(f => f.severity === "medium").length;
+      return { content: [{ type: "text", text: JSON.stringify({
+        summary: { total: allFindings.length, critical, high, medium, low: 0, blocked: critical > 0 || high > 0, changedFiles: changedFiles.length },
+        findings: allFindings,
+      }) }] };
+    }
+
+    // Markdown
+    const lines = [`# GuardVibe Changed Files Report`, ``, `Base: ${base}`, `Changed files: ${changedFiles.length}`, `Issues found: ${allFindings.length}`, ``];
+    if (allFindings.length === 0) {
+      lines.push(`All changed files passed security checks.`);
+    } else {
+      const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+      allFindings.sort((a, b) => (severityOrder[a.severity] ?? 99) - (severityOrder[b.severity] ?? 99));
+      for (const f of allFindings) {
+        lines.push(`- [${f.severity.toUpperCase()}] **${f.name}** (${f.id}) in \`${f.file}\`:${f.line} — ${f.fix}`);
+      }
+    }
+    return { content: [{ type: "text", text: lines.join("\n") }] };
   }
 );
 

@@ -282,6 +282,8 @@ async function runDirectoryScan(targetPath: string, flags: Record<string, string
 
   const format = (flags.format as string) ?? "markdown";
   const outputFile = (flags.output as string) ?? null;
+  const baselinePath = (flags.baseline as string) ?? null;
+  const saveBaseline = flags["save-baseline"] === true || typeof flags["save-baseline"] === "string";
   const scanPath = resolve(targetPath);
 
   let result: string;
@@ -290,7 +292,7 @@ async function runDirectoryScan(targetPath: string, flags: Record<string, string
     const { exportSarif } = await import("./tools/export-sarif.js");
     result = exportSarif(scanPath);
   } else {
-    result = scanDirectory(scanPath, true, [], format === "json" ? "json" : "markdown");
+    result = scanDirectory(scanPath, true, [], format === "json" ? "json" : "markdown", undefined, baselinePath ?? undefined);
   }
 
   if (outputFile) {
@@ -300,10 +302,99 @@ async function runDirectoryScan(targetPath: string, flags: Record<string, string
     console.log(result);
   }
 
+  // Auto-save baseline for future diff comparisons
+  if (saveBaseline && format === "json") {
+    const baselineFile = typeof flags["save-baseline"] === "string"
+      ? flags["save-baseline"]
+      : join(scanPath, ".guardvibe-baseline.json");
+    writeFileSync(baselineFile, result, "utf-8");
+    console.log(`  [OK] Baseline saved to ${baselineFile}`);
+  }
+
   if (format !== "sarif") {
     const hasBlocking = result.includes("[CRITICAL]") || result.includes("[HIGH]");
     if (hasBlocking) process.exit(1);
   }
+}
+
+async function runDiffScan(base: string, flags: Record<string, string | true>): Promise<void> {
+  const { execFileSync } = await import("child_process");
+  const { resolve, extname, basename } = await import("path");
+  const { analyzeCode } = await import("./tools/check-code.js");
+  const { EXTENSION_MAP, CONFIG_FILE_MAP } = await import("./utils/constants.js");
+
+  const format = (flags.format as string) ?? "markdown";
+  const outputFile = (flags.output as string) ?? null;
+  const root = resolve(".");
+
+  let changedFiles: string[];
+  try {
+    const output = execFileSync("git", ["diff", "--name-only", "--diff-filter=ACMR", base], { cwd: root, encoding: "utf-8" });
+    changedFiles = output.trim().split("\n").filter(Boolean);
+  } catch {
+    console.error("  [ERR] Failed to get git diff. Ensure you're in a git repository.");
+    process.exit(1);
+  }
+
+  if (changedFiles.length === 0) {
+    console.log("  No changed files to scan.");
+    return;
+  }
+
+  const allFindings: Array<{ file: string; severity: string; name: string; id: string; line: number; fix: string }> = [];
+
+  for (const relPath of changedFiles) {
+    const fullPath = resolve(root, relPath);
+    if (!existsSync(fullPath)) continue;
+
+    const ext = extname(relPath).toLowerCase();
+    let language = EXTENSION_MAP[ext];
+    if (!language && basename(relPath).startsWith("Dockerfile")) language = "dockerfile";
+    if (!language) language = CONFIG_FILE_MAP[basename(relPath)];
+    if (!language) continue;
+
+    try {
+      const content = readFileSync(fullPath, "utf-8");
+      const findings = analyzeCode(content, language, undefined, fullPath, root);
+      for (const f of findings) {
+        allFindings.push({ file: relPath, severity: f.rule.severity, name: f.rule.name, id: f.rule.id, line: f.line, fix: f.rule.fix });
+      }
+    } catch { /* skip */ }
+  }
+
+  let result: string;
+  if (format === "json") {
+    const critical = allFindings.filter(f => f.severity === "critical").length;
+    const high = allFindings.filter(f => f.severity === "high").length;
+    const medium = allFindings.filter(f => f.severity === "medium").length;
+    result = JSON.stringify({
+      summary: { total: allFindings.length, critical, high, medium, changedFiles: changedFiles.length, blocked: critical > 0 || high > 0 },
+      findings: allFindings,
+    });
+  } else {
+    const lines = [`# GuardVibe Diff Report`, ``, `Base: ${base}`, `Changed files: ${changedFiles.length}`, `Issues: ${allFindings.length}`, ``];
+    if (allFindings.length === 0) {
+      lines.push(`All changed files passed security checks.`);
+    } else {
+      const sev: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+      allFindings.sort((a, b) => (sev[a.severity] ?? 99) - (sev[b.severity] ?? 99));
+      for (const f of allFindings) {
+        lines.push(`- [${f.severity.toUpperCase()}] **${f.name}** (${f.id}) in ${f.file}:${f.line}`);
+        lines.push(`  Fix: ${f.fix}`);
+      }
+    }
+    result = lines.join("\n");
+  }
+
+  if (outputFile) {
+    writeFileSync(outputFile, result, "utf-8");
+    console.log(`  [OK] Results written to ${outputFile}`);
+  } else {
+    console.log(result);
+  }
+
+  const hasBlocking = allFindings.some(f => f.severity === "critical" || f.severity === "high");
+  if (hasBlocking) process.exit(1);
 }
 
 async function runFileCheck(filePath: string, flags: Record<string, string | true>): Promise<void> {
@@ -357,6 +448,7 @@ function printUsage(): void {
 
   Commands:
     npx guardvibe scan [path]        Scan a directory for security issues
+    npx guardvibe diff [base]        Scan only changed files since a git ref
     npx guardvibe check <file>       Scan a single file for security issues
     npx guardvibe init <platform>    Setup MCP server configuration
     npx guardvibe hook install       Install pre-commit security hook
@@ -368,10 +460,12 @@ function printUsage(): void {
     npx guardvibe-scan --format sarif --output results.sarif
 
   Options:
-    --format <type>   Output format: markdown (default), json, sarif
-    --output <file>   Write results to file instead of stdout
-    --version, -V     Print version and exit
-    --help, -h        Show this help message
+    --format <type>       Output format: markdown (default), json, sarif
+    --output <file>       Write results to file instead of stdout
+    --baseline <file>     Compare against a previous scan JSON for fix tracking
+    --save-baseline       Save current scan as baseline (.guardvibe-baseline.json)
+    --version, -V         Print version and exit
+    --help, -h            Show this help message
 
   MCP Platforms:
     claude    Claude Code (.claude.json in project root)
@@ -387,6 +481,8 @@ function printUsage(): void {
     npx guardvibe scan .
     npx guardvibe scan ./src --format json
     npx guardvibe scan . --format sarif --output results.sarif
+    npx guardvibe scan . --format json --save-baseline
+    npx guardvibe scan . --baseline .guardvibe-baseline.json
     npx guardvibe check src/app/api/route.ts
     npx guardvibe check package.json
     npx guardvibe init claude
@@ -464,6 +560,11 @@ async function main(): Promise<void> {
     const { flags, positional } = parseArgs(cliArgs);
     const targetPath = positional[0] ?? ".";
     await runDirectoryScan(targetPath, flags);
+  } else if (command === "diff") {
+    const cliArgs = args.slice(1);
+    const { flags, positional } = parseArgs(cliArgs);
+    const base = positional[0] ?? "main";
+    await runDiffScan(base, flags);
   } else if (command === "check") {
     const cliArgs = args.slice(1);
     const { flags, positional } = parseArgs(cliArgs);
