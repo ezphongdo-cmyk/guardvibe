@@ -184,7 +184,7 @@ export const aiSecurityRules: SecurityRule[] = [
     description:
       "Data fetched from external URLs or APIs is passed directly into LLM prompts. Attackers can embed hidden instructions in web content, RSS feeds, or API responses to hijack the AI agent.",
     pattern:
-      /(?:fetch|axios|got|http\.get|https\.get)\s*\([\s\S]{0,300}?(?:\.text\(\)|\.json\(\)|\.data|\.body)[\s\S]{0,200}?(?:generateText|streamText|messages\.push|prompt\s*[:=]|content\s*[:=]|system\s*[:=])/g,
+      /(?:fetch|axios(?:\.get)?|got)\s*\([\s\S]{0,150}?(?:\.text\(\)|\.json\(\)|\.data|\.body)[\s\S]{0,100}?(?:generateText|streamText|messages\.push|prompt\s*[:=])/g,
     languages: ["javascript", "typescript"],
     fix: "Sanitize external data before including in LLM context. Strip HTML tags, limit length, and add boundary markers.",
     fixCode:

@@ -287,7 +287,7 @@ export const deploymentRules: SecurityRule[] = [
     owasp: "A07:2025 Cross-Site Scripting",
     description:
       "User-controlled input is used in src or href attributes without blocking data: and blob: URL schemes. data:text/html URLs can embed full HTML pages with scripts, and javascript: URLs execute code — bypassing same-origin restrictions.",
-    pattern: /(?:src|href|action|poster|srcDoc)\s*=\s*\{[\s\S]{0,100}?(?:user|input|param|query|data|url|link|content)[\s\S]{0,100}?(?:(?!(?:startsWith|protocol|scheme|allowlist|whitelist|URL\()[\s\S]{0,50}?))\}/gi,
+    pattern: /(?:src|href|action|srcDoc)\s*=\s*\{[^}]*?(?:data\s*:|blob\s*:|javascript\s*:)[^}]*\}/gi,
     languages: ["javascript", "typescript"],
     fix: "Validate URL scheme against an allowlist (https: only). Block data:, blob:, and javascript: URLs from user input.",
     fixCode:

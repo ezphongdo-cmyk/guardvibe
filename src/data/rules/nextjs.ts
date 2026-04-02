@@ -215,7 +215,7 @@ export const nextjsRules: SecurityRule[] = [
     owasp: "A02:2025 Injection",
     description:
       "User input is rendered using an unescaped template directive (EJS <%- %>, Handlebars {{{ }}}, Pug != operator, Nunjucks | safe filter). These directives bypass HTML escaping, allowing attackers to inject arbitrary HTML and JavaScript that executes server-side or client-side.",
-    pattern: /(?:<%-\s*\w|(?:\{\{\{)\s*\w|!=\s*\w[\s\S]{0,50}?(?:user|input|query|body|param|req\.|data\.)|\|\s*safe\s*(?:\}\}|\%\}))/gi,
+    pattern: /(?:<%-\s*\w|(?:\{\{\{)\s*\w|\|\s*safe\s*(?:\}\}|\%\}))/gi,
     languages: ["javascript", "typescript", "html"],
     fix: "Always use escaped template directives: EJS <%= %>, Handlebars {{ }}, Pug =. Only use unescaped rendering for trusted, developer-controlled content.",
     fixCode:

@@ -77,13 +77,16 @@ describe("Deployment Config Rules", () => {
   });
 
   describe("VG524 - Data URL or Blob URL in User-Controlled src/href", () => {
-    it("detects user input in src attribute without validation", () => {
-      testRule("VG524", `<img src={userInput} />`, true);
+    it("detects data: URL in src attribute", () => {
+      testRule("VG524", `<img src={"data:" + userContent} />`, true);
     });
-    it("detects user data in href attribute without validation", () => {
-      testRule("VG524", `<a href={userData} />`, true);
+    it("detects javascript: URL in href attribute", () => {
+      testRule("VG524", `<a href={"javascript:" + payload} />`, true);
     });
-    it("does not match static src attribute", () => {
+    it("ignores relative path in src", () => {
+      testRule("VG524", `<img src={"/images/" + filename} />`, false);
+    });
+    it("ignores static src attribute", () => {
       testRule("VG524", `<img src="/images/logo.png" />`, false);
     });
   });
