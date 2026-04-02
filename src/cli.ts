@@ -127,6 +127,24 @@ function setupClaudeHooksAndGuide(): void {
     writeFileSync(claudeMdPath, `# Project Guidelines\n${guardvibeBlock}`, "utf-8");
     console.log(`  [OK] Created CLAUDE.md with GuardVibe guidance`);
   }
+
+  // Add generated files to .gitignore so they don't get committed
+  addToGitignore([".claude.json", ".claude/", "CLAUDE.md"]);
+}
+
+function addToGitignore(entries: string[]): void {
+  const gitignorePath = join(process.cwd(), ".gitignore");
+  let content = "";
+  try {
+    content = readFileSync(gitignorePath, "utf-8");
+  } catch { /* no .gitignore yet */ }
+
+  const missing = entries.filter(e => !content.split("\n").some(line => line.trim() === e));
+  if (missing.length === 0) return;
+
+  const block = `\n# GuardVibe / Claude Code (auto-added by guardvibe init)\n${missing.join("\n")}\n`;
+  writeFileSync(gitignorePath, content.trimEnd() + block, "utf-8");
+  console.log(`  [OK] Added ${missing.join(", ")} to .gitignore`);
 }
 
 // ── Pre-commit hook ──────────────────────────────────────────────────
@@ -278,6 +296,37 @@ if (SCAN_SCRIPT_DETECTED) {
   main();
 }
 
+/**
+ * Check if scan results should cause a non-zero exit based on --fail-on flag.
+ * Default: "critical" — only exit 1 on critical findings.
+ * Options: "critical", "high", "medium", "low", "none"
+ */
+function shouldFail(result: string, failOn: string): boolean {
+  if (failOn === "none") return false;
+  const levels: Record<string, string[]> = {
+    low: ["critical", "high", "medium", "low"],
+    medium: ["critical", "high", "medium"],
+    high: ["critical", "high"],
+    critical: ["critical"],
+  };
+  const failLevels = levels[failOn] || levels.critical;
+
+  // Try JSON format first
+  try {
+    const parsed = JSON.parse(result);
+    if (parsed.summary) {
+      return failLevels.some(level => (parsed.summary[level] ?? 0) > 0);
+    }
+    if (parsed.findings) {
+      return parsed.findings.some((f: any) => failLevels.includes(f.severity));
+    }
+  } catch { /* not JSON, try markdown tags */ }
+
+  // Markdown format: check for [SEVERITY] tags
+  const tags = failLevels.map(l => `[${l.toUpperCase()}]`);
+  return tags.some(tag => result.includes(tag));
+}
+
 function parseArgs(args: string[]): { flags: Record<string, string | true>; positional: string[] } {
   const flags: Record<string, string | true> = {};
   const positional: string[] = [];
@@ -322,8 +371,8 @@ async function runScan(): Promise<void> {
   }
 
   if (format !== "sarif") {
-    const hasBlocking = result.includes("[CRITICAL]") || result.includes("[HIGH]");
-    if (hasBlocking) process.exit(1);
+    const failOn = (flags["fail-on"] as string) ?? "high";
+    if (shouldFail(result, failOn)) process.exit(1);
   }
 }
 
@@ -363,8 +412,8 @@ async function runDirectoryScan(targetPath: string, flags: Record<string, string
   }
 
   if (format !== "sarif") {
-    const hasBlocking = result.includes("[CRITICAL]") || result.includes("[HIGH]");
-    if (hasBlocking) process.exit(1);
+    const failOn = (flags["fail-on"] as string) ?? "critical";
+    if (shouldFail(result, failOn)) process.exit(1);
   }
 }
 
@@ -444,8 +493,17 @@ async function runDiffScan(base: string, flags: Record<string, string | true>): 
     console.log(result);
   }
 
-  const hasBlocking = allFindings.some(f => f.severity === "critical" || f.severity === "high");
-  if (hasBlocking) process.exit(1);
+  const failOn = (flags["fail-on"] as string) ?? "critical";
+  if (failOn !== "none") {
+    const failLevels: Record<string, string[]> = {
+      low: ["critical", "high", "medium", "low"],
+      medium: ["critical", "high", "medium"],
+      high: ["critical", "high"],
+      critical: ["critical"],
+    };
+    const levels = failLevels[failOn] || failLevels.critical;
+    if (allFindings.some(f => levels.includes(f.severity))) process.exit(1);
+  }
 }
 
 async function runFileCheck(filePath: string, flags: Record<string, string | true>): Promise<void> {
@@ -487,8 +545,8 @@ async function runFileCheck(filePath: string, flags: Record<string, string | tru
     console.log(result);
   }
 
-  const hasBlocking = result.includes("[CRITICAL]") || result.includes("[HIGH]");
-  if (hasBlocking) process.exit(1);
+  const failOn = (flags["fail-on"] as string) ?? "critical";
+  if (shouldFail(result, failOn)) process.exit(1);
 }
 
 // ── Main CLI ─────────────────────────────────────────────────────────
@@ -513,6 +571,8 @@ function printUsage(): void {
   Options:
     --format <type>       Output format: markdown (default), json, sarif
     --output <file>       Write results to file instead of stdout
+    --fail-on <level>     Exit 1 when findings at this level exist
+                          Options: critical (default), high, medium, low, none
     --baseline <file>     Compare against a previous scan JSON for fix tracking
     --save-baseline       Save current scan as baseline (.guardvibe-baseline.json)
     --version, -V         Print version and exit
