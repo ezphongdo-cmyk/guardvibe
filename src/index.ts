@@ -431,6 +431,10 @@ server.tool(
   }
 );
 
+export async function startMcpServer() {
+  return main();
+}
+
 async function main() {
   // Load plugins
   const config = loadConfig(process.cwd());
@@ -472,7 +476,11 @@ async function main() {
   console.error("GuardVibe Security MCP server running on stdio");
 }
 
-main().catch((error) => {
-  console.error("Fatal error:", error);
-  process.exit(1);
-});
+// Only auto-start when run directly (not imported by cli.ts)
+const isDirectRun = process.argv[1]?.replace(/\.js$/, "").endsWith("index");
+if (isDirectRun) {
+  main().catch((error) => {
+    console.error("Fatal error:", error);
+    process.exit(1);
+  });
+}

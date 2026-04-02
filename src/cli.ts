@@ -403,9 +403,22 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
+  if (args[0] === "--help" || args[0] === "-h") {
     printUsage();
     process.exit(0);
+  }
+
+  // No args: if stdin is a pipe, start MCP server; if TTY, show help
+  if (args.length === 0) {
+    if (process.stdin.isTTY) {
+      printUsage();
+      process.exit(0);
+    } else {
+      // Started by MCP client (Claude Code, Cursor, etc.) — launch MCP server
+      const { startMcpServer } = await import("./index.js");
+      await startMcpServer();
+      return;
+    }
   }
 
   const command = args[0];
