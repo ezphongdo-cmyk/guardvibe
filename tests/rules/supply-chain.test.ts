@@ -79,17 +79,20 @@ describe("Supply Chain Rules", () => {
   });
 
   describe("VG866 - Invisible Unicode Characters", () => {
-    it("detects zero-width space in source code", () => {
-      testRule("VG866", "const x = 'hello\u200Bworld';", true);
+    it("detects multiple consecutive zero-width spaces (GlassWorm-style payload)", () => {
+      testRule("VG866", "const x = 'hello\u200B\u200Cworld';", true);
     });
-    it("detects BOM character in source code", () => {
-      testRule("VG866", "const y = \uFEFFsomething;", true);
+    it("detects multiple consecutive invisible chars in code", () => {
+      testRule("VG866", "const y = \uFEFF\u200Bsomething;", true);
     });
-    it("detects soft hyphen in source code", () => {
-      testRule("VG866", "const z = 'test\u00ADvalue';", true);
+    it("ignores single invisible character (likely copy-paste artifact)", () => {
+      testRule("VG866", "const x = 'hello\u200Bworld';", false);
     });
     it("ignores normal source code", () => {
       testRule("VG866", "const x = 'hello world';", false);
+    });
+    it("ignores non-ASCII characters (accented, CJK, etc.)", () => {
+      testRule("VG866", "const name = 'José García';", false);
     });
   });
 

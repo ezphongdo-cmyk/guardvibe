@@ -93,7 +93,7 @@ export const apiSecurityRules: SecurityRule[] = [
     description:
       "Database query returns all records without pagination (no limit/take/top). An attacker can request the entire table, causing DoS or exposing excessive data.",
     pattern:
-      /(?:findMany|find|select|from)\s*\((?:(?!limit|take|top|pageSize|per_?page|first|last|\.limit|LIMIT)[\s\S]){5,}?\)/gi,
+      /(?:\.findMany|\.findAll|\.getAll|\.fetchAll)\s*\((?:(?!limit|take|top|pageSize|per_?page|first|last|\.limit|LIMIT)[\s\S]){5,}?\)/gi,
     languages: ["javascript", "typescript"],
     fix: "Always add pagination: use take/limit with a maximum value. Never return unbounded result sets.",
     fixCode:

@@ -95,7 +95,7 @@ export const supplyChainRules: SecurityRule[] = [
     owasp: "A02:2025 Injection",
     description:
       "Source code contains invisible Unicode characters (zero-width spaces, variation selectors, PUA codepoints). The GlassWorm attack (2025-2026) used these to encode malicious payloads that are invisible in every code editor, compromising 433+ repositories across GitHub, npm, and VSCode.",
-    pattern: /[\u200B\u200C\u200D\uFEFF\u00AD\u2060\u2061\u2062\u2063\u2064\uFE00-\uFE0F]/g,
+    pattern: /[\u200B\u200C\u200D\uFEFF\u2060\u2061\u2062\u2063\u2064]{2,}/g,
     languages: ["javascript", "typescript", "python", "go"],
     fix: "Remove all invisible Unicode characters from source code. Use a linter rule to prevent them.",
     fixCode:
