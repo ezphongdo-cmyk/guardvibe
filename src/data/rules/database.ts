@@ -132,4 +132,18 @@ export const databaseRules: SecurityRule[] = [
       '-- GOOD: view respects RLS\nCREATE VIEW user_orders\n  WITH (security_invoker = true)\n  AS SELECT * FROM orders;\n\n-- BAD: bypasses RLS\n-- CREATE VIEW user_orders AS SELECT * FROM orders;',
     compliance: ["SOC2:CC6.1"],
   },
+  {
+    id: "VG448",
+    name: "Supabase RPC Call May Bypass RLS",
+    severity: "high",
+    owasp: "A01:2025 Broken Access Control",
+    description:
+      "supabase.rpc() calls execute PostgreSQL functions which may bypass Row Level Security if the function is defined as SECURITY DEFINER or if called with the service role key. Ensure the function uses SECURITY INVOKER or validate permissions manually.",
+    pattern: /supabase\.rpc\s*\(\s*["']\w+["']/g,
+    languages: ["javascript", "typescript"],
+    fix: "Ensure PostgreSQL functions called via rpc() use SECURITY INVOKER, or add explicit permission checks. Never call rpc() with the service role key from client-accessible code.",
+    fixCode:
+      '-- PostgreSQL: use SECURITY INVOKER\nCREATE OR REPLACE FUNCTION get_user_data(user_id uuid)\nRETURNS TABLE (id uuid, name text)\nLANGUAGE sql\nSECURITY INVOKER  -- respects RLS!\nAS $$\n  SELECT id, name FROM users WHERE id = user_id;\n$$;\n\n// TypeScript: call with anon key (not service role)\nconst { data } = await supabase.rpc("get_user_data", { user_id: userId });',
+    compliance: ["SOC2:CC6.1"],
+  },
 ];

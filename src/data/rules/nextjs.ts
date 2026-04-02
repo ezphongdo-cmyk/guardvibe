@@ -98,7 +98,7 @@ export const nextjsRules: SecurityRule[] = [
     description:
       "Dynamic route parameters (params, searchParams) are used directly in database queries or operations without validation.",
     pattern:
-      /(?:params|searchParams)\s*[\.\[]\s*["']?\w+["']?\s*[\]\)]?\s*(?:;|\))\s*[\s\S]*?(?:query|execute|findUnique|findFirst|findMany|delete|update|create)\s*\(/g,
+      /(?:(?:await\s+)?(?:params|searchParams))\s*[\)\.\[]\s*["']?\w+["']?\s*[\]\)]?\s*(?:;|\))\s*[\s\S]*?(?:query|execute|findUnique|findFirst|findMany|delete|update|create)\s*\(/g,
     languages: ["javascript", "typescript"],
     fix: "Always validate and sanitize dynamic route parameters before using them in queries.",
     fixCode:
@@ -113,7 +113,7 @@ export const nextjsRules: SecurityRule[] = [
     description:
       "Sensitive data (tokens, secrets, internal IDs) appears to be passed from server to client component as props.",
     pattern:
-      /(?:secret|token|password|apiKey|privateKey|internalId|ssn|creditCard)\s*=\s*\{[\s\S]*?\}/g,
+      /(?:(?:^|[^a-zA-Z])(?:secret|token|password|apiKey|api_key|privateKey|private_key|internalId|ssn|creditCard|credit_card))\s*=\s*\{[\s\S]*?\}/g,
     languages: ["javascript", "typescript"],
     fix: "Never pass sensitive data as props to client components. Keep secrets server-side.",
     fixCode:
@@ -187,7 +187,7 @@ export const nextjsRules: SecurityRule[] = [
     description:
       "Server Action returns a full database query result without field selection. Sensitive fields (passwordHash, internalNotes) get serialized to the client.",
     pattern:
-      /["']use server["'][\s\S]{0,800}?(?:findUnique|findFirst|findMany)\s*\([^)]*\)\s*;?\s*\n\s*return/g,
+      /["']use server["'][\s\S]{0,800}?(?:return\s+\w+\.)?(?:findUnique|findFirst|findMany)\s*\((?:(?!select\s*:)[\s\S])*?\)/g,
     languages: ["javascript", "typescript"],
     fix: "Always use select to return only needed fields from Server Actions.",
     fixCode:

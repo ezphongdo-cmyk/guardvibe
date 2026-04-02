@@ -1,5 +1,5 @@
 import { readFileSync } from "fs";
-import { join, resolve } from "path";
+import { join, resolve, dirname } from "path";
 
 export interface PolicyException {
   ruleId: string;
@@ -46,13 +46,38 @@ function cloneDefaultConfig(): GuardVibeConfig {
   };
 }
 
+/**
+ * Find .guardviberc by walking up from dir to filesystem root.
+ * Returns the path if found, null otherwise.
+ */
+function findConfigFile(startDir: string): string | null {
+  let current = startDir;
+  const root = resolve("/");
+  while (true) {
+    const candidate = join(current, ".guardviberc");
+    try {
+      readFileSync(candidate, "utf-8"); // will throw if not found
+      return candidate;
+    } catch {}
+    const parent = dirname(current);
+    if (parent === current || current === root) break;
+    current = parent;
+  }
+  return null;
+}
+
 export function loadConfig(dir?: string): GuardVibeConfig {
   const configDir = resolve(dir || process.cwd());
   const cached = configCache.get(configDir);
   if (cached) return cached;
 
-  const configPath = join(configDir, ".guardviberc");
+  const configPath = findConfigFile(configDir);
   let resolvedConfig = cloneDefaultConfig();
+
+  if (!configPath) {
+    configCache.set(configDir, resolvedConfig);
+    return resolvedConfig;
+  }
 
   try {
     const content = readFileSync(configPath, "utf-8");

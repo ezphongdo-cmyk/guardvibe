@@ -75,7 +75,58 @@ function setupPlatform(name: string): boolean {
   }
 
   console.log(`  [OK] Added MCP server to ${platform.description}`);
+
+  // For Claude Code: also set up hooks and CLAUDE.md guidance
+  if (name === "claude") {
+    setupClaudeHooksAndGuide();
+  }
+
   return true;
+}
+
+function setupClaudeHooksAndGuide(): void {
+  // Add hook to .claude/settings.json for auto-scan after file edits
+  const claudeSettingsDir = join(process.cwd(), ".claude");
+  if (!existsSync(claudeSettingsDir)) {
+    mkdirSync(claudeSettingsDir, { recursive: true });
+  }
+  const claudeSettingsPath = join(claudeSettingsDir, "settings.json");
+  const existingSettings = readJsonFile(claudeSettingsPath) || {};
+  if (!existingSettings.hooks) {
+    (existingSettings as any).hooks = {};
+  }
+  // Don't overwrite existing hooks
+  if (!(existingSettings as any).hooks.PostToolUse) {
+    (existingSettings as any).hooks.PostToolUse = [
+      {
+        matcher: "Edit|Write",
+        hooks: [
+          {
+            type: "command",
+            command: "echo 'Run guardvibe scan_file on edited files for security check'"
+          }
+        ]
+      }
+    ];
+  }
+
+  writeJsonFile(claudeSettingsPath, existingSettings as any);
+  console.log(`  [OK] Claude Code hooks configured (.claude/settings.json)`);
+
+  // Add CLAUDE.md guidance if not present
+  const claudeMdPath = join(process.cwd(), "CLAUDE.md");
+  const guardvibeBlock = `\n## GuardVibe Security\n\n- After editing security-sensitive files (API routes, auth, middleware), use the \`scan_file\` MCP tool to check for vulnerabilities\n- Before committing, run \`scan_staged\` to catch issues in staged files\n- Use \`scan_changed_files\` with the base branch to review all changes\n- When you find issues, use \`explain_remediation\` for detailed fix guidance\n`;
+
+  if (existsSync(claudeMdPath)) {
+    const content = readFileSync(claudeMdPath, "utf-8");
+    if (!content.includes("GuardVibe")) {
+      writeFileSync(claudeMdPath, content + guardvibeBlock, "utf-8");
+      console.log(`  [OK] GuardVibe guidance added to CLAUDE.md`);
+    }
+  } else {
+    writeFileSync(claudeMdPath, `# Project Guidelines\n${guardvibeBlock}`, "utf-8");
+    console.log(`  [OK] Created CLAUDE.md with GuardVibe guidance`);
+  }
 }
 
 // ── Pre-commit hook ──────────────────────────────────────────────────

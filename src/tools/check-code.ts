@@ -56,6 +56,38 @@ function isInComment(lines: string[], lineNumber: number): boolean {
 }
 
 /**
+ * Check if a match is inside a multi-line string literal (template literal,
+ * fixCode/description property, or string concatenation).
+ * This prevents rule definition files, docs, and test fixtures from triggering
+ * false positives when they contain code examples as string values.
+ */
+function isInsideStringLiteral(lines: string[], lineNumber: number, code: string, matchIndex: number): boolean {
+  const line = lines[lineNumber - 1];
+  if (!line) return false;
+  const trimmed = line.trimStart();
+
+  // Line is part of a template literal or multi-line string
+  // Check if we're between backticks by counting unescaped backticks before this point
+  const before = code.substring(0, matchIndex);
+  const backtickCount = (before.match(/(?<!\\)`/g) || []).length;
+  if (backtickCount % 2 === 1) return true; // inside template literal
+
+  // Line is a string property value (fixCode, description, fix, exploit, audit, fixCode)
+  // Look backwards to find if this line is inside a property assignment string
+  for (let i = lineNumber - 1; i >= Math.max(0, lineNumber - 20); i--) {
+    const prev = lines[i]?.trimStart() || "";
+    // Property assignment with string value that likely spans lines
+    if (/^(?:fixCode|fix|description|exploit|audit|fixCode)\s*[:=]/.test(prev)) return true;
+    if (/^(?:fixCode|fix|description|exploit|audit)\s*:\s*$/.test(prev)) return true;
+    // Hit a rule boundary (id: "VG...) — stop looking
+    if (/^\s*id\s*:\s*["']VG/.test(prev)) break;
+    if (/^\s*\{/.test(prev) && i < lineNumber - 2) break;
+  }
+
+  return false;
+}
+
+/**
  * Check if a match on a given line is inside a string value used as a
  * human-readable message (UI label, error text) rather than an actual secret.
  */
@@ -128,8 +160,9 @@ export function analyzeCode(
     if (rule.id.startsWith("VG54") && filePath && /(?:migrations?|seeds?|fixtures)\//i.test(filePath)) continue;
 
     // Skip server-only import rule (VG964) for files that are inherently server-only:
-    // Route Handlers (app/api/), middleware, instrumentation, next.config
-    if (rule.id === "VG964" && filePath && /(?:\/api\/|middleware\.|instrumentation\.|next\.config\.)/.test(filePath)) continue;
+    // Route Handlers (app/api/), middleware, instrumentation, next.config,
+    // lib/, utils/, tools/, server/, scripts/, CLI files, config files
+    if (rule.id === "VG964" && filePath && /(?:\/api\/|middleware\.|instrumentation\.|next\.config\.|\/lib\/|\/utils\/|\/tools\/|\/server\/|\/scripts\/|\/src\/(?!app\/|pages\/|components\/)|\bcli\b|\.config\.)/.test(filePath)) continue;
 
     // Skip React Native/mobile-only rules (VG70x) in web projects:
     // only apply when framework is react-native/expo or path suggests mobile
@@ -175,6 +208,12 @@ export function analyzeCode(
       // CVE version rules (VG9xx) scan package.json so they're exempt.
       if (!rule.id.startsWith("VG9")) {
         if (isInComment(lines, lineNumber)) continue;
+      }
+
+      // Skip matches inside string literals (fixCode, description, template strings)
+      // This prevents rule definition files and docs from triggering false positives
+      if (!rule.id.startsWith("VG9")) {
+        if (isInsideStringLiteral(lines, lineNumber, code, match.index)) continue;
       }
 
       // Skip hardcoded-credential rules when the value is a human-readable sentence
