@@ -46,7 +46,7 @@ export const modernStackRules: SecurityRule[] = [
     owasp: "A04:2023 Unrestricted Resource Consumption",
     description:
       "File upload handler does not validate file type (MIME type or extension). Attackers can upload executable files, scripts, or malicious content.",
-    pattern: /(?:formData\.get|req\.file|upload|multer|busboy|formidable|Files?\s*\[)[\s\S]{0,500}?(?:writeFile|putObject|upload|save|createBucket|put\s*\()(?:(?!mime|type|extension|contentType|allowedTypes|accept|fileFilter|allowedMimeTypes)[\s\S]){0,200}/gi,
+    pattern: /(?:formData\.get\s*\(|req\.file\b|multer\s*\(|busboy|formidable\s*\(|Files?\s*\[)[\s\S]{0,500}?(?:writeFile|putObject|\.upload\s*\(|\.save\s*\(|createBucket|\.put\s*\()(?:(?!mime|type|extension|contentType|allowedTypes|accept|fileFilter|allowedMimeTypes)[\s\S]){0,200}/gi,
     languages: ["javascript", "typescript"],
     fix: "Always validate file types against an allowlist before storing. Check both MIME type and extension.",
     fixCode:
@@ -60,7 +60,7 @@ export const modernStackRules: SecurityRule[] = [
     owasp: "A04:2023 Unrestricted Resource Consumption",
     description:
       "File upload handler does not enforce a file size limit. Attackers can upload extremely large files to exhaust storage or memory.",
-    pattern: /(?:formData\.get|req\.file|upload)[\s\S]{0,300}?(?:writeFile|putObject|upload|save|put\s*\()(?:(?!size|limit|max|MB|GB|bytes|fileSizeLimit)[\s\S]){0,200}/gi,
+    pattern: /(?:formData\.get\s*\(|req\.file\b|multer\s*\()[\s\S]{0,300}?(?:writeFile|putObject|\.upload\s*\(|\.save\s*\(|\.put\s*\()(?:(?!size|limit|max|MB|GB|bytes|fileSizeLimit)[\s\S]){0,200}/gi,
     languages: ["javascript", "typescript"],
     fix: "Enforce a file size limit before processing uploads. Typical limits: 5MB for images, 50MB for documents.",
     fixCode:

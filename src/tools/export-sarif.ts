@@ -1,3 +1,4 @@
+import { createRequire } from "module";
 import { readFileSync, statSync } from "fs";
 import { extname, basename, resolve } from "path";
 import { analyzeCode, type Finding } from "./check-code.js";
@@ -6,6 +7,9 @@ import { loadConfig } from "../utils/config.js";
 import type { SecurityRule } from "../data/rules/types.js";
 import { EXTENSION_MAP, DEFAULT_EXCLUDES } from "../utils/constants.js";
 import { walkDirectory } from "../utils/walk-directory.js";
+
+const _require = createRequire(import.meta.url);
+const _pkg = _require("../../package.json") as { version: string };
 
 interface SarifResult {
   ruleId: string;
@@ -87,7 +91,7 @@ export function exportSarif(path: string, rules?: SecurityRule[]): string {
       tool: {
         driver: {
           name: "GuardVibe",
-          version: "0.10.0",
+          version: _pkg.version,
           informationUri: "https://guardvibe.dev",
           rules: sarifRules,
         },
