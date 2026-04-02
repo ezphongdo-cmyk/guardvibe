@@ -56,8 +56,10 @@ function detectLanguage(filePath: string): string | null {
   return ext ? extensionMap[ext] ?? null : null;
 }
 
-function calculateScore(critical: number, high: number, medium: number): number {
-  return Math.max(0, Math.min(100, 100 - critical * 25 - high * 10 - medium * 5));
+function calculateScore(critical: number, high: number, medium: number, fileCount: number = 1): number {
+  const weighted = critical * 10 + high * 3 + medium * 1;
+  const density = weighted / Math.max(fileCount, 1);
+  return Math.max(0, Math.min(100, Math.round(100 - density * 20)));
 }
 
 function scoreToGrade(score: number): string {
@@ -90,7 +92,7 @@ export function checkProject(files: FileInput[], format: "markdown" | "json" = "
   const totalHigh = allFindings.filter((f) => f.rule.severity === "high").length;
   const totalMedium = allFindings.filter((f) => f.rule.severity === "medium").length;
   const totalIssues = totalCritical + totalHigh + totalMedium;
-  const score = calculateScore(totalCritical, totalHigh, totalMedium);
+  const score = calculateScore(totalCritical, totalHigh, totalMedium, scannedCount);
   const grade = scoreToGrade(score);
 
   if (format === "json") {

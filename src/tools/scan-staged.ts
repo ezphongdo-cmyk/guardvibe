@@ -102,7 +102,9 @@ export function scanStaged(cwd: string = process.cwd(), format: "markdown" | "js
   const totalHigh = allFindings.filter(f => f.rule.severity === "high").length;
   const totalMedium = allFindings.filter(f => f.rule.severity === "medium").length;
   const totalIssues = totalCritical + totalHigh + totalMedium;
-  const score = Math.max(0, Math.min(100, 100 - totalCritical * 25 - totalHigh * 10 - totalMedium * 5));
+  const weightedIssues = totalCritical * 10 + totalHigh * 3 + totalMedium * 1;
+  const density = weightedIssues / Math.max(scannedCount, 1);
+  const score = Math.max(0, Math.min(100, Math.round(100 - density * 20)));
   const grade = score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : score >= 40 ? "D" : "F";
 
   if (format === "json") {
