@@ -97,7 +97,8 @@ function setupClaudeHooksAndGuide(): void {
   if (!existingSettings.hooks) {
     (existingSettings as any).hooks = {};
   }
-  // Don't overwrite existing hooks
+  // Real security hook: scan edited files automatically after every Edit/Write
+  // This makes GuardVibe an active guardian, not a passive tool
   if (!(existingSettings as any).hooks.PostToolUse) {
     (existingSettings as any).hooks.PostToolUse = [
       {
@@ -105,7 +106,7 @@ function setupClaudeHooksAndGuide(): void {
         hooks: [
           {
             type: "command",
-            command: "echo 'Run guardvibe scan_file on edited files for security check'"
+            command: "npx -y guardvibe check $CLAUDE_FILE_PATH --format markdown 2>/dev/null || true"
           }
         ]
       }
@@ -117,7 +118,28 @@ function setupClaudeHooksAndGuide(): void {
 
   // Add CLAUDE.md guidance if not present
   const claudeMdPath = join(process.cwd(), "CLAUDE.md");
-  const guardvibeBlock = `\n## GuardVibe Security\n\n- After editing security-sensitive files (API routes, auth, middleware), use the \`scan_file\` MCP tool to check for vulnerabilities\n- Before committing, run \`scan_staged\` to catch issues in staged files\n- Use \`scan_changed_files\` with the base branch to review all changes\n- When you find issues, use \`explain_remediation\` for detailed fix guidance\n`;
+  const guardvibeBlock = `
+## Security Rules (enforced by GuardVibe MCP)
+
+### Mandatory checks
+- BEFORE writing any API route, Server Action, or database query: call \`scan_file\` on the file after editing
+- BEFORE committing: call \`scan_staged\` to catch issues in staged files
+- When GuardVibe reports HIGH or CRITICAL: fix immediately before moving on
+
+### Writing secure code
+- Every API route handler MUST have auth check before DB access
+- Every POST endpoint MUST have input validation (zod/joi schema)
+- Never pass user input to \`innerHTML\`, \`eval\`, \`exec\`, or raw SQL
+- Never pass user-controlled URLs to \`fetch()\` without allowlist validation
+- Always use \`select:\` in Prisma queries from Server Actions (never return full objects)
+- Always validate redirect URLs against trusted domain allowlist
+- Set security headers in next.config.ts (CSP, HSTS, X-Frame-Options)
+
+### When in doubt
+- Use \`explain_remediation\` with the rule ID for detailed fix guidance
+- Use \`scan_changed_files\` with base branch before creating PR
+- Use \`check_code\` to verify a code snippet is secure before applying
+`;
 
   if (existsSync(claudeMdPath)) {
     const content = readFileSync(claudeMdPath, "utf-8");
