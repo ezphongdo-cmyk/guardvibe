@@ -103,6 +103,9 @@ export function analyzeCode(
     // Skip npm package rules (VG863/VG864/VG865): only apply to package.json files
     if ((rule.id === "VG863" || rule.id === "VG864" || rule.id === "VG865") && filePath && !filePath.endsWith("package.json")) continue;
 
+    // Skip destructive DDL rules (VG540-VG542) in migration directories
+    if (rule.id.startsWith("VG54") && filePath && /(?:migrations?|seeds?|fixtures)\//i.test(filePath)) continue;
+
     // Skip server-only import rule (VG964) for files that are inherently server-only:
     // Route Handlers (app/api/), middleware, instrumentation, next.config
     if (rule.id === "VG964" && filePath && /(?:\/api\/|middleware\.|instrumentation\.|next\.config\.)/.test(filePath)) continue;

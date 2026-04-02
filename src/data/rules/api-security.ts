@@ -44,7 +44,7 @@ export const apiSecurityRules: SecurityRule[] = [
     description:
       "Next.js Route Handler that performs data operations without any authentication check. API routes are publicly accessible by default.",
     pattern:
-      /export\s+(?:async\s+)?function\s+(?:GET|POST|PUT|DELETE|PATCH)\s*\([^)]*\)\s*\{(?:(?!auth\s*\(|getServerSession|currentUser|getUser|requireAuth|verifyToken|checkAuth|clerkClient|getToken|session|protect)[\s\S]){10,}?(?:prisma|db|supabase|query|fetch|sql)\.\w+/g,
+      /export\s+(?:async\s+)?function\s+(?:GET|POST|PUT|DELETE|PATCH)\s*\([^)]*\)\s*\{(?:(?!auth\s*\(|getServerSession|currentUser|getUser|requireAuth|requireAdmin|requireRole|isAuthenticated|verifyToken|checkAuth|clerkClient|getToken|session|protect|withAuth)[\s\S]){10,}?(?:prisma|db|supabase|query|fetch|sql)\.\w+/g,
     languages: ["javascript", "typescript"],
     fix: "Add authentication at the start of every Route Handler that reads or writes data.",
     fixCode:
