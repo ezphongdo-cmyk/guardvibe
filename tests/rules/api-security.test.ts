@@ -7,6 +7,12 @@ function hasRule(code: string, ruleId: string, lang = "typescript"): boolean {
   return findings.some(f => f.rule.id === ruleId);
 }
 
+// Check if any rule from a set of equivalent rule IDs is present (for dedup-aware tests)
+function hasAnyRule(code: string, ruleIds: string[], lang = "typescript"): boolean {
+  const findings = analyzeCode(code, lang);
+  return findings.some(f => ruleIds.includes(f.rule.id));
+}
+
 describe("OWASP API Security Rules", () => {
   // API1 — BOLA
   describe("VG950 - BOLA: Direct Object Reference", () => {
@@ -52,17 +58,18 @@ describe("OWASP API Security Rules", () => {
   });
 
   // API2 — Broken Authentication
+  // VG952 may be deduplicated by VG420 (same vulnerability class), so accept either
   describe("VG952 - API Route Without Authentication", () => {
     it("detects route handler with db access but no auth", () => {
-      assert(hasRule(
+      assert(hasAnyRule(
         `export async function GET(req) {\n  const items = await prisma.item.findMany();\n  return Response.json(items);\n}`,
-        "VG952"
+        ["VG952", "VG420"]
       ));
     });
     it("allows route handler with auth check", () => {
-      assert(!hasRule(
+      assert(!hasAnyRule(
         `export async function GET(req) {\n  const { userId } = await auth();\n  const items = await prisma.item.findMany();\n}`,
-        "VG952"
+        ["VG952", "VG420"]
       ));
     });
   });
@@ -136,17 +143,18 @@ describe("OWASP API Security Rules", () => {
   });
 
   // API5 — Broken Function Level Authorization
+  // VG957 may be deduplicated by VG426 (same vulnerability class), so accept either
   describe("VG957 - Admin Endpoint Without Role Verification", () => {
     it("detects admin endpoint without role check", () => {
-      assert(hasRule(
+      assert(hasAnyRule(
         `/api/admin/users\nexport async function GET(req) {\n  const users = await prisma.user.findMany();\n  return Response.json(users);\n}`,
-        "VG957"
+        ["VG957", "VG426"]
       ));
     });
     it("allows admin endpoint with role check", () => {
-      assert(!hasRule(
+      assert(!hasAnyRule(
         `/api/admin/users\nexport async function GET(req) {\n  if (orgRole !== "org:admin") return;\n  const users = await prisma.user.findMany();\n}`,
-        "VG957"
+        ["VG957", "VG426"]
       ));
     });
   });

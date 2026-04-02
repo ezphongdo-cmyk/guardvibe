@@ -248,6 +248,20 @@ function isDuplicatePair(a: Finding, b: Finding): boolean {
   if (a.rule.name.includes("innerHTML") && b.rule.name.includes("innerHTML")) return true;
   if (a.rule.name.includes("XSS via innerHTML") && b.rule.name.includes("Unsafe innerHTML")) return true;
   if (a.rule.name.includes("Unsafe innerHTML") && b.rule.name.includes("XSS via innerHTML")) return true;
+  // Both are auth/unprotected route rules — VG420+VG952+VG002 duplicate case
+  const authPatterns = ["Unprotected Route", "Without Authentication", "Missing authentication"];
+  const aIsAuth = authPatterns.some(p => a.rule.name.includes(p));
+  const bIsAuth = authPatterns.some(p => b.rule.name.includes(p));
+  if (aIsAuth && bIsAuth) return true;
+  // Both are CORS wildcard rules — VG040+VG403+VG973 duplicate case
+  const aIsCors = a.rule.name.includes("CORS") && a.rule.name.includes("ildcard");
+  const bIsCors = b.rule.name.includes("CORS") && b.rule.name.includes("ildcard");
+  if (aIsCors && bIsCors) return true;
+  // Both are admin role check rules — VG426+VG957 duplicate case
+  const adminPatterns = ["Admin", "Role Check", "Role Verification"];
+  const aIsAdmin = adminPatterns.some(p => a.rule.name.includes(p));
+  const bIsAdmin = adminPatterns.some(p => b.rule.name.includes(p));
+  if (aIsAdmin && bIsAdmin) return true;
   return false;
 }
 
