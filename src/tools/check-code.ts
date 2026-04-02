@@ -142,6 +142,54 @@ function isRuleDefinitionFile(code: string, filePath?: string): boolean {
   return false;
 }
 
+/**
+ * Detect if code contains an auth guard pattern — regardless of function name.
+ * Matches patterns like:
+ *   const { userId } = await someFunction(); if (!userId) return/throw;
+ *   const { error } = await someFunction(); if (error) return error;
+ *   const session = await someFunction(); if (!session) throw/return;
+ *   await someFunction(); // + early return pattern
+ *
+ * This is naming-agnostic: works for requireAdmin, verifyAuth, checkPermission,
+ * ensureLoggedIn, or any custom auth wrapper.
+ */
+function hasAuthGuardPattern(code: string): boolean {
+  // Pattern 1: destructured result checked with early return/throw
+  // e.g., const { userId } = await xxx(); if (!userId) return;
+  // e.g., const { error } = await xxx(); if (error) return error;
+  if (/(?:const|let)\s+\{[^}]*\}\s*=\s*await\s+\w+\s*\([^)]*\)\s*;?\s*\n\s*if\s*\(\s*!?\w+/.test(code)) {
+    if (/if\s*\([^)]*\)\s*(?:return|throw)\b/.test(code)) return true;
+  }
+
+  // Pattern 2: result assigned then checked
+  // e.g., const session = await xxx(); if (!session) return;
+  if (/(?:const|let)\s+\w+\s*=\s*await\s+\w+\s*\([^)]*\)\s*;?\s*\n\s*if\s*\(\s*!\w+/.test(code)) {
+    return true;
+  }
+
+  // Pattern 3: function called with await that contains auth-like keywords in name
+  // Broad catch: any function name containing auth/session/permission/guard/verify/protect
+  if (/await\s+(?:\w+\.)*\w*(?:auth|Auth|session|Session|permission|Permission|guard|Guard|verify|Verify|protect|Protect|check|Check|ensure|Ensure|require|Require|assert|Assert|authorize|Authorize)\w*\s*\(/i.test(code)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Detect if code has a role/permission check — regardless of function name.
+ * Matches: role === "admin", permission check, role-based condition.
+ */
+function hasRoleCheckPattern(code: string): boolean {
+  // Direct role/permission comparison
+  if (/(?:role|permission|isAdmin|access|level)\s*(?:===|!==|==|!=)\s*["']/i.test(code)) return true;
+  // Function call with role/permission-like args
+  if (/(?:check|require|verify|ensure|assert|has|can)\w*\s*\(\s*["'](?:admin|manager|editor|owner|moderator|superadmin)/i.test(code)) return true;
+  // Destructured role check: const { role } = ...; if (role !== "admin")
+  if (/\brole\b[\s\S]{0,100}?(?:!==|===)\s*["']/i.test(code)) return true;
+  return false;
+}
+
 export function analyzeCode(
   code: string,
   language: string,
@@ -160,6 +208,16 @@ export function analyzeCode(
   const lines = code.split("\n");
   const suppressions = parseSuppressionsFromCode(lines);
 
+  // Pre-analyze: detect auth guards and role checks pattern-agnostically
+  let codeHasAuthGuard = hasAuthGuardPattern(code);
+  const codeHasRoleCheck = hasRoleCheckPattern(code);
+
+  // Config: check custom auth function names from .guardviberc
+  if (!codeHasAuthGuard && config.authFunctions && config.authFunctions.length > 0) {
+    const customPattern = new RegExp(`(?:${config.authFunctions.join("|")})\\s*\\(`, "i");
+    if (customPattern.test(code)) codeHasAuthGuard = true;
+  }
+
   const effectiveRules = rules ?? owaspRules;
 
   for (const rule of effectiveRules) {
@@ -176,25 +234,30 @@ export function analyzeCode(
     if (rule.id.startsWith("VG21") && filePath && !filePath.includes(".github/workflows")) continue;
     if (rule.id.startsWith("VG21") && !filePath && language !== "yaml") continue;
 
-    // Context-aware: skip auth rules for webhook routes that have signature verification
+    // ── Context-aware rule skipping (pattern-agnostic) ──────────────
+    const authRuleIds = new Set(["VG420", "VG952", "VG002", "VG402"]);
+    const adminRoleRuleIds = new Set(["VG426", "VG957"]);
+    const rateLimitRuleIds = new Set(["VG956", "VG030"]);
     const isWebhookRoute = filePath && /webhook/i.test(filePath);
+    const isCronRoute = filePath && /(?:cron|scheduled|jobs?)\//i.test(filePath);
+    const isAdminRoute = filePath && /\/admin\//i.test(filePath);
+
+    // Skip auth rules when code has any auth guard pattern (naming-agnostic)
+    if (codeHasAuthGuard && authRuleIds.has(rule.id)) continue;
+
+    // Skip admin role rules when code has any role/permission check
+    if (codeHasRoleCheck && adminRoleRuleIds.has(rule.id)) continue;
+
+    // Skip auth rules for webhook routes with signature verification
     const hasSignatureVerification = isWebhookRoute && /(?:verify|signature|hmac|constructEvent|svix|webhookSecret|createHmac|X-Signature|stripe-signature)/i.test(code);
-    const authRuleIds = new Set(["VG420", "VG952", "VG002"]);
     if (hasSignatureVerification && authRuleIds.has(rule.id)) continue;
 
-    // Context-aware: skip rate limiting rules for cron/scheduled routes
-    const isCronRoute = filePath && /(?:cron|scheduled|jobs?)\//i.test(filePath);
-    const rateLimitRuleIds = new Set(["VG956", "VG030"]);
+    // Skip rate limiting for cron and webhook routes
     if (isCronRoute && rateLimitRuleIds.has(rule.id)) continue;
-
-    // Context-aware: skip rate limiting rules for webhook routes
-    // Webhooks are called by external services, not users — rate limiting is irrelevant
     if (isWebhookRoute && rateLimitRuleIds.has(rule.id)) continue;
 
-    // Context-aware: skip rate limiting rules for admin routes that have admin auth
-    const isAdminRoute = filePath && /\/admin\//i.test(filePath);
-    const hasAdminAuth = isAdminRoute && /(?:requireAdmin|adminOnly|orgRole|org:admin|isAdmin|checkRole|requireRole|verifyAuth|checkPermission|assertAuth|ensureAuth|authorize)/i.test(code);
-    if (hasAdminAuth && rateLimitRuleIds.has(rule.id)) continue;
+    // Skip rate limiting for admin routes with auth guard
+    if (isAdminRoute && codeHasAuthGuard && rateLimitRuleIds.has(rule.id)) continue;
 
     // Skip npm package rules (VG863/VG864/VG865): only apply to package.json files
     if ((rule.id === "VG863" || rule.id === "VG864" || rule.id === "VG865") && filePath && !filePath.endsWith("package.json")) continue;
@@ -225,7 +288,7 @@ export function analyzeCode(
 
     // Context-aware severity: downgrade rate limiting/pagination issues in admin routes
     // Admin routes behind requireAdmin have lower brute-force risk
-    if (isAdminRoute && hasAdminAuth) {
+    if (isAdminRoute && codeHasAuthGuard) {
       const downgradeInAdmin = new Set(["VG955"]); // pagination in admin is less critical
       if (downgradeInAdmin.has(rule.id) && effectiveRule.severity === "medium") {
         effectiveRule = { ...effectiveRule, severity: "low" as const };

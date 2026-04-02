@@ -27,6 +27,10 @@ export interface GuardVibeConfig {
   };
   plugins: string[];
   compliance?: CompliancePolicy;
+  /** Custom auth function names that GuardVibe should recognize as auth guards.
+   *  e.g. ["requireAdmin", "verifyUser", "ensureLoggedIn"]
+   *  These are added ON TOP of the built-in pattern-agnostic detection. */
+  authFunctions?: string[];
 }
 
 const DEFAULT_CONFIG: GuardVibeConfig = {
@@ -101,6 +105,7 @@ export function loadConfig(dir?: string): GuardVibeConfig {
         exceptions: Array.isArray(parsed.compliance.exceptions) ? parsed.compliance.exceptions : [],
         requiredControls: Array.isArray(parsed.compliance.requiredControls) ? parsed.compliance.requiredControls : undefined,
       } : undefined,
+      authFunctions: Array.isArray(parsed.authFunctions) ? parsed.authFunctions : undefined,
     };
   } catch {}
 
