@@ -159,7 +159,7 @@ export function scanDirectory(
   const totalIssues = totalCritical + totalHigh + totalMedium;
   // Score based on weighted issue density (per file), not raw counts.
   // This makes scoring fair for both small and large projects.
-  const filesScanned = scanResults.length || 1;
+  const filesScanned = metadata.filesScanned || 1;
   const weightedIssues = totalCritical * 10 + totalHigh * 3 + totalMedium * 1;
   const density = weightedIssues / filesScanned;
   // density 0 = 100, density >= 5 = 0
