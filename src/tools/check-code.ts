@@ -368,6 +368,7 @@ export function formatFindingsJson(findings: Finding[], extra?: Record<string, u
   return JSON.stringify({
     summary: {
       total: findings.length, critical, high, medium, low,
+      // blocked: true when critical or high findings exist (would fail --fail-on high)
       blocked: critical > 0 || high > 0,
       ...extra,
     },
@@ -403,18 +404,62 @@ export function checkCode(
 
 function formatCleanReport(language: string, framework?: string): string {
   const ctx = framework ? ` (${framework})` : "";
+  const tips = getLanguageTips(language, framework);
   return [
     `# GuardVibe Security Report`,
     ``,
     `**Language:** ${language}${ctx}`,
     `**Status:** No security issues detected`,
     ``,
-    `The code looks clean! Here are some general tips:`,
-    `- Keep dependencies updated (\`npm audit\`)`,
-    `- Validate all user input with schemas (zod, joi)`,
-    `- Use environment variables for secrets`,
-    `- Add rate limiting to API endpoints`,
+    `Tips for ${language}${ctx}:`,
+    ...tips.map(t => `- ${t}`),
   ].join("\n");
+}
+
+function getLanguageTips(language: string, framework?: string): string[] {
+  if (framework === "nextjs" || framework === "next") return [
+    "Use `server-only` imports in files with secrets or DB access",
+    "Validate Server Action inputs with zod schemas",
+    "Set `serverActions.allowedOrigins` in next.config",
+    "Add security headers via `headers()` in next.config",
+  ];
+  if (framework === "express" || framework === "fastify" || framework === "hono") return [
+    "Add rate limiting middleware to auth and write endpoints",
+    "Use helmet() for security headers",
+    "Validate request body with zod or joi before processing",
+    "Never reflect user input in error responses",
+  ];
+  if (language === "python") return [
+    "Use parameterized queries — never f-strings in SQL",
+    "Add `Depends(get_current_user)` to protected routes",
+    "Pin dependency versions in requirements.txt",
+    "Use `secrets.compare_digest()` for token comparison",
+  ];
+  if (language === "sql") return [
+    "Use `SECURITY INVOKER` on views to respect RLS",
+    "Avoid `GRANT ALL` — use least-privilege permissions",
+    "Add `IF EXISTS` to destructive DDL for safety",
+    "Use parameterized queries in application code",
+  ];
+  if (language === "dockerfile") return [
+    "Use specific image tags, never `latest`",
+    "Run as non-root user with `USER` directive",
+    "Use multi-stage builds to minimize attack surface",
+    "Don't copy `.env` or secrets into the image",
+  ];
+  if (language === "yaml" || language === "terraform") return [
+    "Never hardcode secrets in config — use env vars or secrets manager",
+    "Pin action/provider versions to specific SHA or tag",
+    "Use least-privilege IAM policies",
+    "Enable audit logging for infrastructure changes",
+  ];
+  // Default for JS/TS
+  return [
+    "Keep dependencies updated (`npm audit`)",
+    "Validate all user input with schemas (zod, joi)",
+    "Use environment variables for secrets",
+    "Use `textContent` instead of `innerHTML` for user data",
+  ];
 }
 
 function formatReport(

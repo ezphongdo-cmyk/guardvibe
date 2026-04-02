@@ -62,6 +62,8 @@ function setupPlatform(name: string): boolean {
     }
     if ((existing.mcpServers as Record<string, unknown>)["guardvibe"]) {
       console.log(`  [OK] GuardVibe already configured in ${platform.description}`);
+      // Still ensure CLAUDE.md and .gitignore are set up
+      if (name === "claude") setupClaudeHooksAndGuide();
       return true;
     }
     (existing.mcpServers as Record<string, unknown>)["guardvibe"] = GUARDVIBE_MCP_CONFIG;
@@ -253,9 +255,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-
-      - name: Install dependencies
-        run: npm ci
 
       - name: Run GuardVibe security scan
         run: npx -y guardvibe-scan --format sarif --output guardvibe-results.sarif
