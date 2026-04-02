@@ -69,7 +69,7 @@ export const deploymentRules: SecurityRule[] = [
     description:
       "Secret or API key hardcoded in vercel.json. This file is committed to git.",
     pattern:
-      /["'](?:SECRET|KEY|TOKEN|PASSWORD|CREDENTIAL)\w*["']\s*:\s*["'][A-Za-z0-9_\-]{12,}["']/gi,
+      /["'](?:\w+_(?:SECRET|KEY|TOKEN|PASSWORD|CREDENTIAL)|(?:SECRET|PASSWORD|CREDENTIAL)_?\w*)["']\s*:\s*["'][A-Za-z0-9_\-]{12,}["']/gi,
     languages: ["vercel-config", "json"],
     fix: "Use Vercel environment variables (vercel env add) instead of hardcoding in config files.",
     fixCode:

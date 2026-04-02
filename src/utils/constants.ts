@@ -32,4 +32,6 @@ export const DEFAULT_EXCLUDES = new Set([
   "node_modules", ".git", "build", "dist", "vendor", "__pycache__",
   ".next", ".nuxt", ".svelte-kit", "target", "bin", "obj",
   "coverage", ".turbo", ".venv", "venv",
+  ".vercel", ".clerk", ".wrangler", ".netlify", ".amplify",
+  ".serverless", ".firebase", ".expo", ".output",
 ]);

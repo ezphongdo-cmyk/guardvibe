@@ -99,6 +99,9 @@ export function analyzeCode(
     // When no filePath (MCP call), allow if language is yaml.
     if (rule.id.startsWith("VG21") && filePath && !filePath.includes(".github/workflows")) continue;
     if (rule.id.startsWith("VG21") && !filePath && language !== "yaml") continue;
+
+    // Skip npm package rules (VG863/VG864/VG865): only apply to package.json files
+    if ((rule.id === "VG863" || rule.id === "VG864" || rule.id === "VG865") && filePath && !filePath.endsWith("package.json")) continue;
     rule.pattern.lastIndex = 0;
 
     // Apply severity override from config
