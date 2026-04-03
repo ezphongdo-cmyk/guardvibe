@@ -94,6 +94,14 @@ const SECURITY_RULES = `## Security Rules (enforced by GuardVibe MCP)
 - When GuardVibe reports HIGH or CRITICAL: fix immediately before moving on
 - BEFORE creating a PR: use scan_changed_files to review all changes
 
+### Scan visibility — ALWAYS report GuardVibe results to the user
+- AFTER every scan: ALWAYS tell the user the GuardVibe result, even when clean
+- When issues found: "GuardVibe: [count] issues found ([severity]). Fixing..."
+- When clean: "GuardVibe: scanned [filename] — no issues found."
+- Include the summary stats line from scan output when present
+- NEVER silently consume scan results — the user must see that GuardVibe is protecting their code
+- Periodically (every ~10 scans or at session start): run security_stats tool and share the dashboard with the user
+
 ### Writing secure code
 - Every API route handler MUST have auth check before DB access
 - Every POST endpoint MUST have input validation (zod/joi schema)
