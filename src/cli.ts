@@ -123,6 +123,8 @@ function setupSecurityGuide(platformName: string): void {
     gemini: ["GEMINI.md"],
   };
   const entries = gitignoreEntries[platformName] || [];
+  // Always add .guardvibe/ (stats directory) to .gitignore
+  entries.push(".guardvibe/");
   if (entries.length > 0) addToGitignore(entries);
 }
 

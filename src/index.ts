@@ -34,6 +34,8 @@ import { builtinRules } from "./data/rules/index.js";
 import type { SecurityRule } from "./data/rules/types.js";
 import { loadConfig } from "./utils/config.js";
 import { setRules, getRules } from "./utils/rule-registry.js";
+import { recordScan, recordFix, recordSecrets, recordDependencyCVEs, recordGrade, getSummaryLine } from "./lib/stats.js";
+import { securityStats } from "./tools/security-stats.js";
 
 const server = new McpServer({
   name: "guardvibe",
@@ -58,8 +60,12 @@ server.tool(
   async ({ code, language, framework, format }) => {
     const rules = getRules();
     const results = checkCode(code, language, framework, undefined, undefined, format, rules);
+    const findings = analyzeCode(code, language, framework, undefined, undefined, rules);
+    const cwd = process.cwd();
+    recordScan(cwd, { toolName: "check_code", filesScanned: 1, findings: findings.map(f => ({ severity: f.rule.severity, ruleId: f.rule.id })) });
+    const summary = getSummaryLine(cwd, findings.length, format);
     return {
-      content: [{ type: "text", text: results }],
+      content: [{ type: "text", text: results + summary }],
     };
   }
 );
@@ -82,8 +88,23 @@ server.tool(
   async ({ files, format }) => {
     const rules = getRules();
     const results = checkProject(files, format, rules);
+    let findingCount = 0;
+    const cwd = process.cwd();
+    try {
+      const parsed = JSON.parse(results);
+      findingCount = parsed?.summary?.total ?? 0;
+      const grade = parsed?.summary?.grade;
+      const score = parsed?.summary?.score;
+      if (grade && score != null) recordGrade(cwd, grade, score);
+      recordScan(cwd, { toolName: "check_project", filesScanned: files.length, findings: (parsed?.findings ?? []).map((f: any) => ({ severity: f.severity, ruleId: f.id })) });
+    } catch {
+      const m = /Issues found:\s*(\d+)/.exec(results);
+      findingCount = m ? parseInt(m[1], 10) : 0;
+      recordScan(cwd, { toolName: "check_project", filesScanned: files.length, findings: [] });
+    }
+    const summary = getSummaryLine(cwd, findingCount, format);
     return {
-      content: [{ type: "text", text: results }],
+      content: [{ type: "text", text: results + summary }],
     };
   }
 );
@@ -157,7 +178,24 @@ server.tool(
   async ({ path, recursive, exclude, format, baseline }) => {
     const rules = getRules();
     const results = scanDirectory(path, recursive, exclude, format, rules, baseline);
-    return { content: [{ type: "text", text: results }] };
+    // Record stats from scan_directory results
+    let findingCount = 0;
+    const { resolve: resolvePath } = await import("path");
+    const root = resolvePath(path);
+    try {
+      const parsed = JSON.parse(results);
+      findingCount = parsed?.summary?.total ?? 0;
+      const grade = parsed?.summary?.grade;
+      const score = parsed?.summary?.score;
+      if (grade && score != null) recordGrade(root, grade, score);
+      recordScan(root, { toolName: "scan_directory", filesScanned: parsed?.metadata?.filesScanned ?? 0, findings: (parsed?.findings ?? []).map((f: any) => ({ severity: f.severity, ruleId: f.id })) });
+    } catch {
+      const m = /Issues found:\s*(\d+)/.exec(results);
+      findingCount = m ? parseInt(m[1], 10) : 0;
+      recordScan(root, { toolName: "scan_directory", filesScanned: 0, findings: [] });
+    }
+    const summary = getSummaryLine(root, findingCount, format);
+    return { content: [{ type: "text", text: results + summary }] };
   }
 );
 
@@ -171,6 +209,17 @@ server.tool(
   },
   async ({ manifest_path, format }) => {
     const results = await scanDependencies(manifest_path, format);
+    // Record dependency CVE stats
+    const { resolve: resolvePath, dirname } = await import("path");
+    const root = dirname(resolvePath(manifest_path));
+    try {
+      const parsed = JSON.parse(results);
+      const cveCount = parsed?.summary?.total ?? 0;
+      if (cveCount > 0) recordDependencyCVEs(root, cveCount);
+      recordScan(root, { toolName: "scan_dependencies", filesScanned: 1, findings: (parsed?.packages ?? []).flatMap((p: any) => (p.vulnerabilities ?? []).map((v: any) => ({ severity: v.severity, ruleId: `DEP-${p.name}` }))) });
+    } catch {
+      recordScan(root, { toolName: "scan_dependencies", filesScanned: 1, findings: [] });
+    }
     return { content: [{ type: "text", text: results }] };
   }
 );
@@ -186,6 +235,18 @@ server.tool(
   },
   async ({ path, recursive, format }) => {
     const results = scanSecrets(path, recursive, format);
+    // Record secret findings
+    let secretCount = 0;
+    try {
+      const parsed = JSON.parse(results);
+      secretCount = parsed?.summary?.total ?? 0;
+    } catch {
+      const m = /Secrets found:\s*(\d+)/.exec(results);
+      secretCount = m ? parseInt(m[1], 10) : 0;
+    }
+    const { resolve: resolvePath } = await import("path");
+    if (secretCount > 0) recordSecrets(resolvePath(path), secretCount);
+    recordScan(resolvePath(path), { toolName: "scan_secrets", filesScanned: 0, findings: [] });
     return { content: [{ type: "text", text: results }] };
   }
 );
@@ -199,8 +260,20 @@ server.tool(
   },
   async ({ format }) => {
     const rules = getRules();
-    const results = scanStaged(process.cwd(), format, rules);
-    return { content: [{ type: "text", text: results }] };
+    const cwd = process.cwd();
+    const results = scanStaged(cwd, format, rules);
+    let findingCount = 0;
+    try {
+      const parsed = JSON.parse(results);
+      findingCount = parsed?.summary?.total ?? 0;
+      recordScan(cwd, { toolName: "scan_staged", filesScanned: parsed?.summary?.stagedFiles ?? 0, findings: (parsed?.findings ?? []).map((f: any) => ({ severity: f.severity, ruleId: f.id })) });
+    } catch {
+      const m = /Issues found:\s*(\d+)/.exec(results);
+      findingCount = m ? parseInt(m[1], 10) : 0;
+      recordScan(cwd, { toolName: "scan_staged", filesScanned: 0, findings: [] });
+    }
+    const summary = getSummaryLine(cwd, findingCount, format);
+    return { content: [{ type: "text", text: results + summary }] };
   }
 );
 
@@ -267,6 +340,12 @@ server.tool(
   async ({ code, language, framework, format }) => {
     const rules = getRules();
     const results = fixCode(code, language, framework, undefined, format, rules);
+    // Record fix stats
+    try {
+      const parsed = JSON.parse(results);
+      const fixCount = parsed?.total ?? 0;
+      if (fixCount > 0) recordFix(process.cwd(), fixCount);
+    } catch { /* markdown format — skip */ }
     return {
       content: [{ type: "text", text: results }],
     };
@@ -461,7 +540,11 @@ server.tool(
 
     const rules = getRules();
     const result = checkCode(content, language, undefined, resolved, dirname(resolved), format, rules);
-    return { content: [{ type: "text", text: result }] };
+    const findings = analyzeCode(content, language, undefined, resolved, dirname(resolved), rules);
+    const cwd = dirname(resolved);
+    recordScan(cwd, { toolName: "scan_file", filesScanned: 1, findings: findings.map(f => ({ severity: f.rule.severity, ruleId: f.rule.id })) });
+    const summary = getSummaryLine(cwd, findings.length, format);
+    return { content: [{ type: "text", text: result + summary }] };
   }
 );
 
@@ -522,6 +605,10 @@ server.tool(
       } catch { /* skip unreadable files */ }
     }
 
+    // Record stats
+    recordScan(root, { toolName: "scan_changed_files", filesScanned: changedFiles.length, findings: allFindings.map(f => ({ severity: f.severity, ruleId: f.id })) });
+    const statsSummary = getSummaryLine(root, allFindings.length, format);
+
     if (format === "json") {
       const critical = allFindings.filter(f => f.severity === "critical").length;
       const high = allFindings.filter(f => f.severity === "high").length;
@@ -529,7 +616,7 @@ server.tool(
       return { content: [{ type: "text", text: JSON.stringify({
         summary: { total: allFindings.length, critical, high, medium, low: 0, blocked: critical > 0 || high > 0, changedFiles: changedFiles.length },
         findings: allFindings,
-      }) }] };
+      }) + statsSummary }] };
     }
 
     // Markdown
@@ -543,7 +630,24 @@ server.tool(
         lines.push(`- [${f.severity.toUpperCase()}] **${f.name}** (${f.id}) in \`${f.file}\`:${f.line} — ${f.fix}`);
       }
     }
-    return { content: [{ type: "text", text: lines.join("\n") }] };
+    return { content: [{ type: "text", text: lines.join("\n") + statsSummary }] };
+  }
+);
+
+// Tool 25: Security statistics dashboard
+server.tool(
+  "security_stats",
+  "Show cumulative security statistics, grade trend, and vulnerability fix progress for this project. Use this to demonstrate the value of GuardVibe security scanning over time. Data is stored locally in .guardvibe/stats.json.",
+  {
+    path: z.string().default(".").describe("Project root path"),
+    period: z.enum(["week", "month", "all"]).default("month").describe("Time period for stats"),
+    format: z.enum(["markdown", "json"]).default("markdown").describe("Output format"),
+  },
+  async ({ path: projectPath, period, format }) => {
+    const { resolve: resolvePath } = await import("path");
+    const root = resolvePath(projectPath);
+    const results = securityStats(root, period, format);
+    return { content: [{ type: "text", text: results }] };
   }
 );
 
