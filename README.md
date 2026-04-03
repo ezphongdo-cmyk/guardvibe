@@ -7,7 +7,7 @@
 
 **The security MCP built for vibe coding.** 307 security rules covering the entire AI-generated code journey — from first line to production deployment.
 
-Works with **Claude Code, Cursor, Gemini CLI, Codex, Windsurf**, and any MCP-compatible coding agent.
+Works with **Claude Code, Cursor, Gemini CLI, Codex, VS Code (Copilot), Windsurf**, and any MCP-compatible coding agent.
 
 ## Why GuardVibe
 
@@ -47,13 +47,72 @@ GuardVibe is purpose-built for the AI coding workflow. Traditional tools are exc
 
 ## Quick Start
 
-### MCP setup (recommended)
+### Claude Code
 
 ```bash
-npx guardvibe init claude    # Claude Code
-npx guardvibe init cursor    # Cursor
-npx guardvibe init gemini    # Gemini CLI
-npx guardvibe init all       # All platforms
+npx guardvibe init claude
+```
+
+Creates `.claude.json` MCP config, `.claude/settings.json` auto-scan hooks, and `CLAUDE.md` security rules. Restart Claude Code after setup.
+
+### Cursor
+
+```bash
+npx guardvibe init cursor
+```
+
+Creates `.cursor/mcp.json` and `.cursorrules` with security rules. Restart Cursor after setup.
+
+### Gemini CLI
+
+```bash
+npx guardvibe init gemini
+```
+
+Creates `~/.gemini/settings.json` MCP config and `GEMINI.md` security rules.
+
+### Codex (OpenAI)
+
+```bash
+codex mcp add guardvibe -- npx -y guardvibe
+```
+
+### VS Code (GitHub Copilot)
+
+Create `.vscode/mcp.json` in your project:
+
+```json
+{
+  "servers": {
+    "guardvibe": {
+      "command": "npx",
+      "args": ["-y", "guardvibe"]
+    }
+  }
+}
+```
+
+> **Note:** VS Code uses `"servers"`, not `"mcpServers"`.
+
+### Windsurf
+
+Add to `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "guardvibe": {
+      "command": "npx",
+      "args": ["-y", "guardvibe"]
+    }
+  }
+}
+```
+
+### All platforms at once
+
+```bash
+npx guardvibe init all       # Claude + Cursor + Gemini
 ```
 
 ### Pre-commit hook
@@ -67,19 +126,6 @@ npx guardvibe hook uninstall # Remove hook
 
 ```bash
 npx guardvibe ci github      # Generates .github/workflows/guardvibe.yml
-```
-
-### Manual MCP config
-
-```json
-{
-  "mcpServers": {
-    "guardvibe": {
-      "command": "npx",
-      "args": ["-y", "guardvibe"]
-    }
-  }
-}
 ```
 
 ## What GuardVibe Scans
