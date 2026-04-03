@@ -44,8 +44,13 @@ function isExcepted(ruleId: string, filePath: string, exceptions: PolicyExceptio
     if (exc.files && exc.files.length > 0) {
       const matches = exc.files.some(pattern => {
         if (pattern.includes("*")) {
-          const regex = new RegExp(pattern.replace(/\*/g, ".*"));
-          return regex.test(filePath);
+          // Safe glob-to-regex: escape all regex metacharacters except our converted .*
+          const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*");
+          try {
+            return new RegExp(`^${escaped}$`).test(filePath);
+          } catch {
+            return false; // malformed pattern — skip safely
+          }
         }
         return filePath.includes(pattern);
       });
