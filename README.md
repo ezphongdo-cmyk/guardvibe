@@ -5,7 +5,7 @@
 [![Node.js CI](https://github.com/goklab/guardvibe/actions/workflows/ci.yml/badge.svg)](https://github.com/goklab/guardvibe/actions/workflows/ci.yml)
 [![npm provenance](https://img.shields.io/badge/provenance-verified-brightgreen)](https://www.npmjs.com/package/guardvibe)
 
-**The security MCP built for vibe coding.** 322 security rules covering the entire AI-generated code journey — from first line to production deployment.
+**The security MCP built for vibe coding.** 307 security rules covering the entire AI-generated code journey — from first line to production deployment.
 
 Works with **Claude Code, Cursor, Gemini CLI, Codex, Windsurf**, and any MCP-compatible coding agent.
 
@@ -13,7 +13,7 @@ Works with **Claude Code, Cursor, Gemini CLI, Codex, Windsurf**, and any MCP-com
 
 Most security tools are built for enterprise security teams. GuardVibe is built for **you** — the developer using AI to build and ship web apps fast.
 
-- **322 security rules** purpose-built for the stacks AI agents generate
+- **307 security rules** purpose-built for the stacks AI agents generate
 - **Zero setup friction** — `npx guardvibe` and you're scanning
 - **No account required** — runs 100% locally, no API keys, no cloud
 - **Understands your stack** — not generic SAST, but rules that know Next.js, Supabase, Stripe, Clerk, and the tools you actually use
@@ -39,7 +39,7 @@ GuardVibe is purpose-built for the AI coding workflow. Traditional tools are exc
 | CVE version detection | 21 packages | Extensive | Extensive |
 | Compliance mapping (SOC2, PCI-DSS, HIPAA) | Built-in | Paid tier | None |
 | SARIF CI/CD export | Yes | Yes | Limited |
-| Rule count | 322 (focused) | 5000+ (broad) | N/A |
+| Rule count | 307 (focused) | 5000+ (broad) | N/A |
 
 **When to use GuardVibe:** You're building with AI agents and want security scanning integrated into your coding workflow — no dashboard, no account, no CI setup.
 
@@ -164,31 +164,32 @@ Malicious postinstall scripts, unpinned GitHub Actions, typosquat detection
 
 All scanning tools support `format: "json"` for machine-readable output.
 
-## Security Rules (322 rules across 23 modules)
+## Security Rules (307 rules across 23 modules)
 
 | Category | Rules | Coverage |
 |----------|-------|----------|
-| Core OWASP | 19 | SQL injection, XSS, CSRF, command injection, CORS, SSRF, hardcoded secrets |
-| Next.js App Router | 13 | Server Actions, secret exposure, auth bypass, CSP, redirects |
+| Core OWASP | 38 | SQL injection, XSS, CSRF, command injection, CORS, SSRF, hardcoded secrets |
+| Next.js App Router | 17 | Server Actions, secret exposure, auth bypass, CSP, redirects |
 | Auth (Clerk / Auth.js / Supabase Auth) | 16 | Middleware, secret keys, session storage, role checks, SSR cookies |
-| Database (Supabase / Prisma / Drizzle) | 8 | Raw queries, client exposure, service role leaks |
+| Database (Supabase / Prisma / Drizzle) | 10 | Raw queries, client exposure, service role leaks |
 | OWASP API Security | 10 | BOLA/IDOR, mass assignment, pagination, rate limiting, error leaks |
-| Modern Stack | 30 | Zod, tRPC, Hono, GraphQL, Uploadthing, Turso, Convex, OAuth, CSP, webhooks, AI SDK |
-| Deployment Config | 16 | Vercel, Next.js config, Docker Compose, Fly, Render, Netlify |
+| Modern Stack | 36 | Zod, tRPC, Hono, GraphQL, Uploadthing, Turso, Convex, OAuth, CSP, webhooks, AI SDK |
+| Deployment Config | 20 | Vercel, Next.js config, Docker Compose, Fly, Render, Netlify, Cloudflare |
 | Payments (Stripe / Polar / Lemon) | 9 | Webhook signatures, key exposure, price manipulation |
 | Services (Resend / Upstash / Pinecone / PostHog) | 11 | API key leaks, PII tracking, email injection |
-| Web Security | 14 | Webhooks, CSP, .env safety, AI key exposure, Cloudflare |
+| Web Security | 15 | Webhooks, CSP, .env safety, AI key exposure, cookie handling |
 | React Native / Expo | 10 | AsyncStorage secrets, deep links, ATS, hardcoded URLs |
 | Firebase | 7 | Firestore rules, admin SDK, storage, custom tokens |
-| AI / LLM Security | 14 | Prompt injection, MCP SSRF, excessive agency, indirect injection |
-| CVE Version Intelligence | 20 | Known vulnerable versions in package.json (21 CVEs) |
+| AI / LLM Security | 16 | Prompt injection, MCP SSRF, excessive agency, indirect injection |
+| CVE Version Intelligence | 21 | Known vulnerable versions in package.json (21 CVEs) |
 | Shell / Bash | 5 | Pipe to bash, chmod 777, rm -rf, sudo password |
 | SQL | 4 | DROP/DELETE without WHERE, stacked queries, GRANT ALL |
-| Supply Chain | 2 | Malicious install scripts, unpinned actions |
+| Supply Chain | 10 | Malicious install scripts, unpinned actions, typosquat detection |
 | Go | 6 | SQL injection, command injection, template escaping |
-| Dockerfile | 5 | Root user, secrets in ENV, untagged images |
-| CI/CD (GitHub Actions) | 4 | Secrets interpolation, unpinned actions, write-all permissions |
-| Terraform | 5 | Public S3, open security groups, IAM wildcards |
+| Dockerfile | 7 | Root user, secrets in ENV, untagged images, non-root user |
+| CI/CD (GitHub Actions) | 7 | Secrets interpolation, unpinned actions, write-all permissions |
+| Terraform | 6 | Public S3, open security groups, IAM wildcards |
+| Advanced Security | 21 | ReDoS, CRLF injection, race conditions, XXE, brute force, audit logging |
 | Other Services | 5 | AWS, GCP, MongoDB, Convex, Sentry, Twilio |
 
 ## CLI Commands
