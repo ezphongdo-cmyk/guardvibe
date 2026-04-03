@@ -5,7 +5,7 @@
 [![Node.js CI](https://github.com/goklab/guardvibe/actions/workflows/ci.yml/badge.svg)](https://github.com/goklab/guardvibe/actions/workflows/ci.yml)
 [![npm provenance](https://img.shields.io/badge/provenance-verified-brightgreen)](https://www.npmjs.com/package/guardvibe)
 
-**The security MCP built for vibe coding.** 277 security rules covering the entire AI-generated code journey — from first line to production deployment.
+**The security MCP built for vibe coding.** 322 security rules covering the entire AI-generated code journey — from first line to production deployment.
 
 Works with **Claude Code, Cursor, Gemini CLI, Codex, Windsurf**, and any MCP-compatible coding agent.
 
@@ -13,7 +13,7 @@ Works with **Claude Code, Cursor, Gemini CLI, Codex, Windsurf**, and any MCP-com
 
 Most security tools are built for enterprise security teams. GuardVibe is built for **you** — the developer using AI to build and ship web apps fast.
 
-- **277 security rules** purpose-built for the stacks AI agents generate
+- **322 security rules** purpose-built for the stacks AI agents generate
 - **Zero setup friction** — `npx guardvibe` and you're scanning
 - **No account required** — runs 100% locally, no API keys, no cloud
 - **Understands your stack** — not generic SAST, but rules that know Next.js, Supabase, Stripe, Clerk, and the tools you actually use
@@ -39,7 +39,7 @@ GuardVibe is purpose-built for the AI coding workflow. Traditional tools are exc
 | CVE version detection | 21 packages | Extensive | Extensive |
 | Compliance mapping (SOC2, PCI-DSS, HIPAA) | Built-in | Paid tier | None |
 | SARIF CI/CD export | Yes | Yes | Limited |
-| Rule count | 277 (focused) | 5000+ (broad) | N/A |
+| Rule count | 322 (focused) | 5000+ (broad) | N/A |
 
 **When to use GuardVibe:** You're building with AI agents and want security scanning integrated into your coding workflow — no dashboard, no account, no CI setup.
 
@@ -132,7 +132,7 @@ SOC2, PCI-DSS, HIPAA control mapping with compliance reports
 ### Supply Chain
 Malicious postinstall scripts, unpinned GitHub Actions, typosquat detection
 
-## Tools (22 MCP tools)
+## Tools (25 MCP tools)
 
 | Tool | What it does |
 |------|-------------|
@@ -158,10 +158,13 @@ Malicious postinstall scripts, unpinned GitHub Actions, typosquat detection
 | `scan_config_change` | Compare config file versions to detect security downgrades |
 | `repo_security_posture` | Assess overall repository security posture and map sensitive areas |
 | `explain_remediation` | Get detailed remediation guidance with exploit scenarios and fix strategies |
+| `scan_file` | Real-time single-file scan — designed for post-edit hooks |
+| `scan_changed_files` | Scan only git-changed files — for PRs and incremental CI |
+| `security_stats` | Cumulative security dashboard — scans, fixes, grade trend over time |
 
 All scanning tools support `format: "json"` for machine-readable output.
 
-## Security Rules (277 rules across 23 modules)
+## Security Rules (322 rules across 23 modules)
 
 | Category | Rules | Coverage |
 |----------|-------|----------|
@@ -303,6 +306,23 @@ app.get("/api/health", (req, res) => res.json({ ok: true }));
 ```
 
 Supports `//`, `#`, and `<!-- -->` comment styles.
+
+## GuardVibe Scans Itself
+
+We run GuardVibe on its own codebase. In v2.3.2, GuardVibe caught a **HIGH severity ReDoS vulnerability** in its own `policy-check.ts` — a regex injection risk that the developer missed during code review.
+
+```
+$ guardvibe scan_directory src/
+  Files scanned: 64
+  Scan duration: 102ms
+  Grade: B (89/100)
+
+  [HIGH] ReDoS via User-Controlled RegExp (VG107)
+    File: src/tools/policy-check.ts:47
+    Fix: escape regex metacharacters before passing to RegExp constructor
+```
+
+The vulnerability was fixed in the same session. This is exactly the workflow GuardVibe enables: catch what humans miss, fix before it ships.
 
 ## How It Works
 
