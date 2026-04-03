@@ -318,7 +318,7 @@ function generateRLS(stack: StackDetection): RlsSuggestion[] {
   if (stack.database.includes("prisma") || stack.database.includes("drizzle")) {
     suggestions.push({
       table: "N/A (ORM-level)",
-      policy: `// Always filter by authenticated user\nconst items = await prisma.item.findMany({ where: { userId: session.user.id } });`,
+      policy: `// Always filter by authenticated user\nconst items = await prisma.item.findMany({ where: { userId: session.user.id } });`, // guardvibe-ignore VG955
       description: "Without RLS, enforce row-level access in your ORM queries. Always include user ID in WHERE clauses.",
     });
   }
@@ -398,7 +398,7 @@ export function generatePolicy(
     ``,
     "```typescript",
     `// next.config.ts`,
-    `async headers() {`,
+    `async headers() {`, // guardvibe-ignore
     `  return [{`,
     `    source: "/(.*)",`,
     `    headers: [`,
