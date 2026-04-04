@@ -294,4 +294,18 @@ export const deploymentRules: SecurityRule[] = [
       '// Validate URL scheme\nfunction isSafeUrl(url: string): boolean {\n  try {\n    const parsed = new URL(url);\n    return ["https:", "http:"].includes(parsed.protocol);\n  } catch {\n    return false;\n  }\n}\n\n// Usage\n<img src={isSafeUrl(userUrl) ? userUrl : "/placeholder.png"} />',
     compliance: ["SOC2:CC7.1"],
   },
+  {
+    id: "VG911",
+    name: "Kubernetes Secret Hardcoded Value",
+    severity: "critical",
+    owasp: "A07:2025 Identification and Authentication Failures",
+    description:
+      "Kubernetes Secret manifest contains hardcoded base64-encoded values in the data field. These secrets are only base64-encoded (not encrypted) and will be exposed in version control. Use External Secrets, Sealed Secrets, or a secrets manager instead.",
+    pattern: /kind:\s*Secret[\s\S]*?data:[\s\S]*?(?!\s*\{\{)[\w+/=]{8,}/g,
+    languages: ["yaml"],
+    fix: "Never commit Secret manifests with hardcoded values. Use External Secrets Operator, Sealed Secrets, or inject secrets via CI/CD pipeline. Store sensitive values in a secrets manager (Vault, AWS Secrets Manager, etc.).",
+    fixCode:
+      '# Use External Secrets Operator\napiVersion: external-secrets.io/v1beta1\nkind: ExternalSecret\nmetadata:\n  name: my-secret\nspec:\n  refreshInterval: 1h\n  secretStoreRef:\n    name: vault-backend\n    kind: SecretStore\n  target:\n    name: my-secret\n  data:\n    - secretKey: password\n      remoteRef:\n        key: secret/data/myapp\n        property: password',
+    compliance: ["SOC2:CC6.1", "PCI-DSS:Req6.5.3", "HIPAA:§164.312(a)"],
+  },
 ];

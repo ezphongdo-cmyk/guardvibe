@@ -146,4 +146,18 @@ export const databaseRules: SecurityRule[] = [
       '-- PostgreSQL: use SECURITY INVOKER\nCREATE OR REPLACE FUNCTION get_user_data(user_id uuid)\nRETURNS TABLE (id uuid, name text)\nLANGUAGE sql\nSECURITY INVOKER  -- respects RLS!\nAS $$\n  SELECT id, name FROM users WHERE id = user_id;\n$$;\n\n// TypeScript: call with anon key (not service role)\nconst { data } = await supabase.rpc("get_user_data", { user_id: userId });',
     compliance: ["SOC2:CC6.1"],
   },
+  {
+    id: "VG912",
+    name: "MongoDB NoSQL Injection via Query Operators",
+    severity: "high",
+    owasp: "A02:2025 Injection",
+    description:
+      "MongoDB query operators ($where, $regex, $gt, $ne, $nin) used in database queries may be vulnerable to NoSQL injection if user input is passed directly without validation. Attackers can manipulate query logic to bypass authentication or extract data.",
+    pattern: /\.(find|findOne|updateOne|deleteOne|aggregate)\(\s*\{[^}]*(\$where|\$regex|\$gt|\$ne|\$nin)/g,
+    languages: ["javascript", "typescript"],
+    fix: "Validate and sanitize all user input before using it in MongoDB queries. Use a schema validation library (zod, joi) to ensure query parameters match expected types. Never pass raw request body directly to MongoDB queries.",
+    fixCode:
+      'import { z } from "zod";\n\n// Validate input before query\nconst schema = z.object({ id: z.string().regex(/^[a-f0-9]{24}$/) });\nconst { id } = schema.parse(req.body);\n\n// Safe query — no raw operators from user input\nconst user = await db.collection("users").findOne({ _id: new ObjectId(id) });',
+    compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.1"],
+  },
 ];

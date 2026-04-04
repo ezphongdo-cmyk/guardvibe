@@ -571,4 +571,18 @@ export const modernStackRules: SecurityRule[] = [
       'import { randomUUID } from "crypto";\nimport path from "path";\n\n// Generate safe filename\nconst ext = path.extname(file.name).toLowerCase();\nconst ALLOWED_EXT = [".jpg", ".jpeg", ".png", ".webp", ".pdf"];\nif (!ALLOWED_EXT.includes(ext)) throw new Error("Invalid file type");\nconst safeName = `${randomUUID()}${ext}`;\nawait fs.writeFile(`/uploads/${safeName}`, buffer);',
     compliance: ["SOC2:CC7.1"],
   },
+  {
+    id: "VG910",
+    name: "Hono SSE Injection via streamSSE",
+    severity: "medium",
+    owasp: "A02:2025 Injection",
+    description:
+      "Hono's streamSSE() sends Server-Sent Events to clients. If event, id, or retry fields contain unsanitized user input, attackers can inject CR/LF characters to forge SSE messages, hijack event streams, or trigger client-side actions. Related to CVE-2026-29085.",
+    pattern: /streamSSE\s*\(/g,
+    languages: ["javascript", "typescript"],
+    fix: "Sanitize all SSE field values by stripping CR/LF characters (\\r, \\n) before passing them to streamSSE. Never use raw user input in event, id, or retry fields.",
+    fixCode:
+      '// Sanitize SSE fields\nfunction sanitizeSSE(value: string): string {\n  return value.replace(/[\\r\\n]/g, "");\n}\n\n// Usage with Hono streamSSE\nreturn streamSSE(c, async (stream) => {\n  await stream.writeSSE({\n    event: sanitizeSSE(eventName),\n    data: sanitizeSSE(data),\n    id: sanitizeSSE(id),\n  });\n});',
+    compliance: ["SOC2:CC7.1"],
+  },
 ];
