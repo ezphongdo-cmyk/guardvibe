@@ -4,6 +4,7 @@
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Node.js CI](https://github.com/goklab/guardvibe/actions/workflows/ci.yml/badge.svg)](https://github.com/goklab/guardvibe/actions/workflows/ci.yml)
 [![npm provenance](https://img.shields.io/badge/provenance-verified-brightgreen)](https://www.npmjs.com/package/guardvibe)
+[![codecov](https://codecov.io/gh/goklab/guardvibe/graph/badge.svg)](https://codecov.io/gh/goklab/guardvibe)
 
 **The security MCP built for vibe coding.** 313 security rules covering the entire AI-generated code journey — from first line to production deployment.
 
