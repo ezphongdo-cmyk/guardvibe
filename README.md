@@ -5,7 +5,7 @@
 [![Node.js CI](https://github.com/goklab/guardvibe/actions/workflows/ci.yml/badge.svg)](https://github.com/goklab/guardvibe/actions/workflows/ci.yml)
 [![npm provenance](https://img.shields.io/badge/provenance-verified-brightgreen)](https://www.npmjs.com/package/guardvibe)
 
-**The security MCP built for vibe coding.** 307 security rules covering the entire AI-generated code journey — from first line to production deployment.
+**The security MCP built for vibe coding.** 313 security rules covering the entire AI-generated code journey — from first line to production deployment.
 
 Works with **Claude Code, Cursor, Gemini CLI, Codex, VS Code (Copilot), Windsurf**, and any MCP-compatible coding agent.
 
@@ -13,7 +13,7 @@ Works with **Claude Code, Cursor, Gemini CLI, Codex, VS Code (Copilot), Windsurf
 
 Most security tools are built for enterprise security teams. GuardVibe is built for **you** — the developer using AI to build and ship web apps fast.
 
-- **307 security rules** purpose-built for the stacks AI agents generate
+- **313 security rules** purpose-built for the stacks AI agents generate
 - **Zero setup friction** — `npx guardvibe` and you're scanning
 - **No account required** — runs 100% locally, no API keys, no cloud
 - **Understands your stack** — not generic SAST, but rules that know Next.js, Supabase, Stripe, Clerk, and the tools you actually use
@@ -39,7 +39,7 @@ GuardVibe is purpose-built for the AI coding workflow. Traditional tools are exc
 | CVE version detection | 21 packages | Extensive | Extensive |
 | Compliance mapping (SOC2, PCI-DSS, HIPAA) | Built-in | Paid tier | None |
 | SARIF CI/CD export | Yes | Yes | Limited |
-| Rule count | 307 (focused) | 5000+ (broad) | N/A |
+| Rule count | 313 (focused) | 5000+ (broad) | N/A |
 
 **When to use GuardVibe:** You're building with AI agents and want security scanning integrated into your coding workflow — no dashboard, no account, no CI setup.
 
@@ -210,7 +210,7 @@ Malicious postinstall scripts, unpinned GitHub Actions, typosquat detection
 
 All scanning tools support `format: "json"` for machine-readable output.
 
-## Security Rules (307 rules across 23 modules)
+## Security Rules (313 rules across 23 modules)
 
 | Category | Rules | Coverage |
 |----------|-------|----------|
@@ -230,7 +230,7 @@ All scanning tools support `format: "json"` for machine-readable output.
 | CVE Version Intelligence | 21 | Known vulnerable versions in package.json (21 CVEs) |
 | Shell / Bash | 5 | Pipe to bash, chmod 777, rm -rf, sudo password |
 | SQL | 4 | DROP/DELETE without WHERE, stacked queries, GRANT ALL |
-| Supply Chain | 10 | Malicious install scripts, unpinned actions, typosquat detection |
+| Supply Chain | 16 | Malicious install scripts, lockfile integrity, dependency confusion, typosquat detection |
 | Go | 6 | SQL injection, command injection, template escaping |
 | Dockerfile | 7 | Root user, secrets in ENV, untagged images, non-root user |
 | CI/CD (GitHub Actions) | 7 | Secrets interpolation, unpinned actions, write-all permissions |

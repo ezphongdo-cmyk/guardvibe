@@ -79,12 +79,90 @@ interface TyposquatResult {
   confidence: number;
 }
 
+// Deceptive prefixes used in supply chain attacks (e.g., "plain-crypto-js" → "crypto-js")
+const DECEPTIVE_PREFIXES = [
+  "plain-", "real-", "original-", "safe-", "secure-", "true-", "actual-",
+  "verified-", "legit-", "official-", "clean-", "pure-", "native-", "simple-",
+  "fast-", "super-", "ultra-", "better-", "enhanced-", "improved-", "modern-",
+  "updated-", "new-", "my-", "the-", "a-", "node-", "js-", "ts-",
+];
+
+// Deceptive suffixes (e.g., "lodash-utils" → "lodash", "express-js" → "express")
+const DECEPTIVE_SUFFIXES = [
+  "-js", "-ts", "-node", "-utils", "-util", "-lib", "-helper", "-helpers",
+  "-core", "-plus", "-pro", "-next", "-new", "-v2", "-v3", "-latest",
+  "-fixed", "-patched", "-secure", "-safe", "-clean",
+];
+
+/**
+ * Detects prefix/suffix squatting attacks.
+ * e.g., "plain-crypto-js" strips to "crypto-js" → exact match → high confidence typosquat.
+ */
+function detectPrefixSuffixSquat(name: string): TyposquatResult | null {
+  const lower = name.toLowerCase();
+
+  for (const prefix of DECEPTIVE_PREFIXES) {
+    if (lower.startsWith(prefix)) {
+      const stripped = lower.slice(prefix.length);
+      if (POPULAR_PACKAGES.includes(stripped)) {
+        return { similarTo: stripped, confidence: 0.95 };
+      }
+      // Also check Levenshtein against stripped name
+      for (const popular of POPULAR_PACKAGES) {
+        const popularBare = popular.startsWith("@") ? popular.split("/").pop() ?? popular : popular;
+        if (Math.abs(stripped.length - popularBare.length) <= 1 && levenshtein(stripped, popularBare) === 1) {
+          return { similarTo: popular, confidence: 0.85 };
+        }
+      }
+    }
+  }
+
+  for (const suffix of DECEPTIVE_SUFFIXES) {
+    if (lower.endsWith(suffix)) {
+      const stripped = lower.slice(0, -suffix.length);
+      if (POPULAR_PACKAGES.includes(stripped)) {
+        return { similarTo: stripped, confidence: 0.9 };
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Detects separator manipulation attacks.
+ * e.g., "crypto_js" → "crypto-js", "crypto.js" → "crypto-js"
+ */
+function detectSeparatorSquat(name: string): TyposquatResult | null {
+  const lower = name.toLowerCase();
+  // Replace underscores and dots with hyphens, then check
+  const normalized = lower.replace(/[_.]/g, "-");
+  if (normalized !== lower && POPULAR_PACKAGES.includes(normalized)) {
+    return { similarTo: normalized, confidence: 0.9 };
+  }
+  // Reverse: replace hyphens with underscores/dots
+  const withUnderscore = lower.replace(/-/g, "_");
+  if (withUnderscore !== lower && POPULAR_PACKAGES.includes(withUnderscore)) {
+    return { similarTo: withUnderscore, confidence: 0.9 };
+  }
+  return null;
+}
+
 export function detectTyposquat(name: string): TyposquatResult | null {
   const lower = name.toLowerCase();
 
   // Exact match = not a typosquat
   if (POPULAR_PACKAGES.includes(lower)) return null;
 
+  // 1. Check prefix/suffix squatting (highest priority — Axios attack pattern)
+  const prefixSuffix = detectPrefixSuffixSquat(lower);
+  if (prefixSuffix) return prefixSuffix;
+
+  // 2. Check separator manipulation
+  const separator = detectSeparatorSquat(lower);
+  if (separator) return separator;
+
+  // 3. Classic Levenshtein distance check
   // Strip scope for comparison
   const bareName = lower.startsWith("@") ? lower.split("/").pop() ?? lower : lower;
 
