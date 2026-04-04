@@ -1,3 +1,4 @@
+import { basename } from "path";
 import { owaspRules, type SecurityRule } from "../data/rules/index.js";
 import { loadConfig } from "../utils/config.js";
 import { loadIgnoreFile, isIgnored } from "../utils/ignore.js";
@@ -449,13 +450,17 @@ export function checkCode(
   framework?: string,
   filePath?: string,
   configDir?: string,
-  format: "markdown" | "json" = "markdown",
+  format: "markdown" | "json" | "buddy" = "markdown",
   rules?: SecurityRule[]
 ): string {
   const findings = analyzeCode(code, language, framework, filePath, configDir, rules);
 
   if (format === "json") {
     return formatFindingsJson(findings);
+  }
+
+  if (format === "buddy") {
+    return formatBuddyOutput(findings, filePath);
   }
 
   if (findings.length === 0) {
@@ -620,4 +625,58 @@ function formatReport(
   }
 
   return lines.join("\n");
+}
+
+// ─── Buddy Format ────────────────────────────────────────────────
+
+function severityWeight(s: string): number {
+  return s === "critical" ? 4 : s === "high" ? 3 : s === "medium" ? 2 : 1;
+}
+
+function formatBuddyOutput(findings: Finding[], filePath?: string): string {
+  const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+  for (const f of findings) {
+    const sev = f.rule.severity as keyof typeof counts;
+    if (sev in counts) counts[sev]++;
+  }
+
+  let score = 100;
+  score -= counts.critical * 15;
+  score -= counts.high * 8;
+  score -= counts.medium * 3;
+  score -= counts.low * 1;
+  score = Math.max(0, Math.min(100, score));
+  const grade = score >= 90 ? "A" : score >= 75 ? "B" : score >= 60 ? "C" : score >= 40 ? "D" : "F";
+
+  const faces: Record<string, string> = {
+    A: "\\[^_^]/",
+    B: " [^_^]b",
+    C: " [o_o] ",
+    D: " [>_<] ",
+    F: " [X_X]!",
+  };
+  const face = faces[grade] || faces.C;
+
+  const messages: Record<string, string[]> = {
+    A: ["All clear, captain!", "Fort Knox level!", "Zero issues. Nice!", "Secure & clean!"],
+    B: ["Looking good!", "Almost perfect!", "Solid work!", "Just minor things."],
+    C: ["Some issues here...", "Needs attention.", "Review recommended."],
+    D: ["Multiple issues!", "Fix these ASAP.", "Getting risky..."],
+    F: ["Red alert!", "Critical issues!", "Stop and fix now!", "Danger zone!"],
+  };
+  const pool = messages[grade] || messages.C;
+  const msg = pool[Math.floor(Math.random() * pool.length)];
+
+  if (findings.length === 0) {
+    return `🛡️ ${face} GuardVibe: ${grade} [${score}] ✓ ${msg}`;
+  }
+
+  const sorted = [...findings].sort((a, b) => severityWeight(b.rule.severity) - severityWeight(a.rule.severity));
+  const top = sorted[0];
+  const fileName = filePath ? basename(filePath) : "unknown";
+  const severityIcon = counts.critical > 0 ? "🚨" : counts.high > 0 ? "⚠" : "⚡";
+  const total = counts.critical + counts.high + counts.medium + counts.low;
+  const detail = `${total} issue${total > 1 ? "s" : ""} — ${top.rule.name} (${fileName}:${top.line})`;
+
+  return `🛡️ ${face} GuardVibe: ${grade} [${score}] ${severityIcon} ${detail} — ${msg}`;
 }

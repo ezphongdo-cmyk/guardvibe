@@ -150,7 +150,7 @@ function setupClaudeGuide(): void {
         matcher: "Edit|Write",
         hooks: [{
           type: "command",
-          command: "jq -r '.tool_input.file_path' | xargs npx -y guardvibe check --format markdown 2>/dev/null || true"
+          command: "jq -r '.tool_input.file_path' | xargs npx -y guardvibe check --format buddy 2>/dev/null || true"
         }]
       }
     ];
@@ -603,7 +603,8 @@ async function runFileCheck(filePath: string, flags: Record<string, string | tru
   }
 
   const format = (flags.format as string) ?? "markdown";
-  const result = checkCode(content, language, undefined, resolved, undefined, format === "json" ? "json" : "markdown");
+  const formatArg = format === "json" ? "json" as const : format === "buddy" ? "buddy" as const : "markdown" as const;
+  const result = checkCode(content, language, undefined, resolved, undefined, formatArg);
 
   const outputFile = (flags.output as string) ?? null;
   if (outputFile) {
@@ -637,7 +638,7 @@ function printUsage(): void {
     npx guardvibe-scan --format sarif --output results.sarif
 
   Options:
-    --format <type>       Output format: markdown (default), json, sarif
+    --format <type>       Output format: markdown (default), json, sarif, buddy
     --output <file>       Write results to file instead of stdout
     --fail-on <level>     Exit 1 when findings at this level or above exist
                           critical (default) | high | medium | low | none
