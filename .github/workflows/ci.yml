@@ -25,11 +25,14 @@ jobs:
       - run: npm ci
       - run: npm audit --audit-level=moderate
       - run: npm run build
-      - run: npm run lint
+      - name: Lint
+        if: matrix.node-version >= 20
+        run: npm run lint
       - run: npm run test:coverage
       - name: Upload coverage to Codecov
         if: matrix.node-version == 22
         uses: codecov/codecov-action@75cd11691c0faa626561e295848008c8a7dddffe # v5
         with:
           files: ./coverage/lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
