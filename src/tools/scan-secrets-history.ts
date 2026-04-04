@@ -45,7 +45,7 @@ function getFileAtCommit(cwd: string, commitHash: string, filePath: string): str
   }
 }
 
-function fileExistsAtHead(cwd: string, filePath: string): boolean {
+function _fileExistsAtHead(cwd: string, filePath: string): boolean {
   const result = execGit(["cat-file", "-e", `HEAD:${filePath}`], cwd);
   // cat-file -e returns empty on success, error message on failure
   return result === "";

@@ -16,14 +16,14 @@ export interface IgnoreEntry {
   filePattern: string | null; // null = all files
 }
 
-let ignoreCache: Map<string, IgnoreEntry[]> = new Map();
+const ignoreCache: Map<string, IgnoreEntry[]> = new Map();
 
 export function loadIgnoreFile(dir: string): IgnoreEntry[] {
   const cached = ignoreCache.get(dir);
   if (cached) return cached;
 
   const ignorePath = join(dir, ".guardvibeignore");
-  let entries: IgnoreEntry[] = [];
+  const entries: IgnoreEntry[] = [];
 
   try {
     const content = readFileSync(ignorePath, "utf-8");

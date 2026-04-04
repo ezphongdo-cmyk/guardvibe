@@ -1,6 +1,6 @@
 import { execFileSync } from "child_process";
 import { extname, basename } from "path";
-import { analyzeCode, type Finding } from "./check-code.js";
+import { analyzeCode } from "./check-code.js";
 import type { SecurityRule } from "../data/rules/types.js";
 import { EXTENSION_MAP, CONFIG_FILE_MAP } from "../utils/constants.js";
 
@@ -74,7 +74,7 @@ function detectLanguage(filePath: string): string | null {
   return CONFIG_FILE_MAP[basename(filePath)] ?? null;
 }
 
-function assessConfidence(rule: SecurityRule, match: string): number {
+function assessConfidence(rule: SecurityRule, _match: string): number {
   // Higher confidence for specific patterns (secrets, hardcoded values)
   if (rule.id.startsWith("VG0") || rule.id.startsWith("VG6")) return 0.95; // core + secrets
   if (rule.severity === "critical") return 0.90;

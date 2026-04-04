@@ -1,5 +1,5 @@
-import { readdirSync, readFileSync, existsSync, statSync } from "fs";
-import { join, resolve, extname, basename } from "path";
+import { readdirSync, readFileSync, existsSync } from "fs";
+import { join, resolve } from "path";
 
 interface PostureArea {
   name: string;

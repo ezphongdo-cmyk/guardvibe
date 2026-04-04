@@ -1,6 +1,6 @@
 // guardvibe-ignore — this file analyzes shell commands for security risks
 import { resolve, basename } from "path";
-import { existsSync, readdirSync } from "fs";
+import { existsSync } from "fs";
 
 export interface CommandVerdict {
   verdict: "allow" | "ask" | "deny";

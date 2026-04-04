@@ -20,7 +20,7 @@ export async function checkDependencies(
   ];
 
   let totalVulns = 0;
-  let criticalPackages: string[] = [];
+  const criticalPackages: string[] = [];
 
   for (const pkg of packages) {
     try {

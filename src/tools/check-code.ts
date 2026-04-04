@@ -77,10 +77,10 @@ function isInsideStringLiteral(lines: string[], lineNumber: number, code: string
   if (/^\s*\+\s*["']/.test(line)) return true; // + "string continuation"
 
   // 3. Line contains escaped newlines (\n) suggesting it's inside a string value
-  const quotesBefore = line.substring(0, line.indexOf(trimmed.charAt(0)));
+  const _quotesBefore = line.substring(0, line.indexOf(trimmed.charAt(0)));
   if (/\\n/.test(line) && /["'`].*\\n/.test(line)) {
     // Extra check: is the match portion inside quotes on this line?
-    const matchEnd = matchIndex + 20; // approximate
+    const _matchEnd = matchIndex + 20; // approximate
     const lineStart = code.lastIndexOf("\n", matchIndex) + 1;
     const col = matchIndex - lineStart;
     const beforeCol = line.substring(0, col);

@@ -1,7 +1,7 @@
 import { readFileSync, statSync } from "fs";
 import { extname, basename, resolve } from "path";
-import { analyzeCode, type Finding } from "./check-code.js";
-import { loadConfig, type CompliancePolicy, type PolicyException } from "../utils/config.js";
+import { analyzeCode } from "./check-code.js";
+import { loadConfig, type PolicyException } from "../utils/config.js";
 import type { SecurityRule } from "../data/rules/types.js";
 import { EXTENSION_MAP, CONFIG_FILE_MAP, DEFAULT_EXCLUDES } from "../utils/constants.js";
 import { walkDirectory } from "../utils/walk-directory.js";

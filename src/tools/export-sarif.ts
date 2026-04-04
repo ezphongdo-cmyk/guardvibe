@@ -1,7 +1,7 @@
 import { createRequire } from "module";
 import { readFileSync, statSync } from "fs";
 import { extname, basename, resolve } from "path";
-import { analyzeCode, type Finding } from "./check-code.js";
+import { analyzeCode } from "./check-code.js";
 import { owaspRules } from "../data/rules/index.js";
 import { loadConfig } from "../utils/config.js";
 import type { SecurityRule } from "../data/rules/types.js";

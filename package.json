@@ -1,6 +1,6 @@
 {
   "name": "guardvibe",
-  "version": "2.4.2",
+  "version": "2.4.3",
   "description": "Security MCP for vibe coding. 313 rules, 25 tools for Next.js, Supabase, Clerk, Stripe, Prisma, tRPC, Hono, GraphQL, Convex, Turso, Uploadthing, AI SDK, and the full AI-generated stack.",
   "type": "module",
   "bin": {
@@ -8,6 +8,7 @@
     "guardvibe-init": "build/cli.js",
     "guardvibe-scan": "build/cli.js"
   },
+  "main": "./build/index.js",
   "types": "./build/index.d.ts",
   "files": [
     "build",
@@ -30,6 +31,7 @@
     "dev": "tsc --watch",
     "start": "node build/index.js",
     "prepare": "npm run build",
+    "lint": "eslint src/",
     "test": "node --import tsx --test tests/**/*.test.ts"
   },
   "keywords": [
@@ -87,6 +89,9 @@
     "mass-assignment",
     "auto-fix"
   ],
+  "funding": {
+    "url": "https://github.com/sponsors/goklab"
+  },
   "author": "GokLab",
   "license": "Apache-2.0",
   "homepage": "https://guardvibe.dev",
@@ -103,8 +108,10 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "eslint": "^10.2.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.58.0"
   },
   "engines": {
     "node": ">=18.0.0"

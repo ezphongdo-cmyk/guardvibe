@@ -2,7 +2,7 @@ import { createRequire } from "module";
 import { readFileSync, statSync } from "fs";
 import { extname, basename, resolve } from "path";
 import { createHash, randomUUID } from "crypto";
-import { analyzeCode, formatFindingsJson, type Finding } from "./check-code.js";
+import { analyzeCode, type Finding } from "./check-code.js";
 import { loadConfig } from "../utils/config.js";
 import type { SecurityRule } from "../data/rules/types.js";
 import { DEFAULT_EXCLUDES, EXTENSION_MAP, CONFIG_FILE_MAP } from "../utils/constants.js";
