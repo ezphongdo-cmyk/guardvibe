@@ -5,6 +5,70 @@ All notable changes to GuardVibe are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.1] - 2026-04-04
+
+### Added
+- VG910: Hono SSE injection detection via `streamSSE()` (CVE-2026-29085)
+- VG911: Kubernetes Secret hardcoded value detection
+- VG912: MongoDB NoSQL injection via query operators
+
+## [2.4.0] - 2026-04-04
+
+### Added
+- Buddy format (`--format buddy`) — compact ASCII character with mood-based security feedback
+- 5 face expressions based on security grade (A through F)
+- Grade-aware contextual message pool
+
+### Changed
+- Claude Code hook now uses buddy format by default for real-time visual feedback
+
+## [2.3.9] - 2026-04-03
+
+### Added
+- 6 new supply chain rules (VG860-868)
+- Yarn and pnpm lockfile support
+- Advanced typosquat detection
+
+## [2.3.8] - 2026-04-03
+
+### Changed
+- Capitalize extension name to GuardVibe in Gemini CLI gallery
+
+## [2.3.7] - 2026-04-02
+
+### Added
+- Gemini CLI extensions gallery support (gemini-extension.json)
+
+## [2.3.6] - 2026-04-02
+
+### Added
+- Platform-specific setup guides for all 6 IDEs in README
+
+## [2.3.5] - 2026-04-01
+
+### Fixed
+- Correct rule count: 322 → 307 (actual), update all module counts in README
+
+## [2.3.4] - 2026-04-01
+
+### Fixed
+- Suppress false positives in generate-policy template strings
+
+## [2.3.3] - 2026-04-01
+
+### Changed
+- README: add self-scan dogfooding section, update stats to 322 rules / 25 tools
+
+## [2.3.2] - 2026-04-01
+
+### Fixed
+- Fix ReDoS in policy-check glob matching (VG107)
+
+## [2.3.1] - 2026-04-01
+
+### Changed
+- Scan visibility rules: agent always reports GuardVibe results to user
+
 ## [1.7.1] - 2026-04-01
 
 ### Added
