@@ -104,10 +104,13 @@ export function enumerateRoutes(files: FileEntry[]): RouteInfo[] {
  * Returns array of matcher patterns.
  */
 export function parseMiddlewareMatchers(content: string): string[] {
-  const stringMatch = /matcher\s*:\s*"([^"]+)"/.exec(content);
+  // Normalize literal escape sequences that AI assistants may pass
+  const normalized = content.replace(/\\n/g, "\n").replace(/\\t/g, "\t");
+
+  const stringMatch = /matcher\s*:\s*"([^"]+)"/.exec(normalized);
   if (stringMatch) return [stringMatch[1]];
 
-  const arrayMatch = /matcher\s*:\s*\[([^\]]+)\]/.exec(content);
+  const arrayMatch = /matcher\s*:\s*\[([^\]]+)\]/.exec(normalized);
   if (arrayMatch) {
     return arrayMatch[1]
       .split(",")
