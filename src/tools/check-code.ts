@@ -320,6 +320,8 @@ export function analyzeCode(
     /(?:\.replace\s*\(\s*\/\[?\^?[a-z0-9\\-_\]]*\]?\/?[gi]*\s*,|sanitize(?:File|Name|Path)|safeName|cleanName)/i.test(code) ||
     /(?:Date\.now\(\)|timestamp|uuid|nanoid|crypto\.randomUUID)[\s\S]{0,80}?\.\s*(?:ext|split|pop)/i.test(code);
   const isPeerDeps = /["']peerDependencies["']/i.test(code);
+  const codeHasAuthSession =
+    /(?:supabase\.auth\.getUser|supabase\.auth\.getSession|getServerSession|auth\(\)|getSession\(\)|currentUser\(\))/i.test(code);
 
   // Config: check custom auth function names from .guardviberc
   if (!codeHasAuthGuard && config.authFunctions && config.authFunctions.length > 0) {
@@ -586,6 +588,23 @@ export function analyzeCode(
       if (rule.id === "VG106") {
         const varName = match[0].split(/\s*(?:===|!==|==|!=)/)[0].trim();
         if (/(?:Count|Length|Balance|Map|List|Array|Index|Size|Total|Num|Id|Type|Name|Status|Data|Info|Error|Result|Response|Config|Option|Url|Path|Provider|Model|Limit|Quota|Rate|Max|Min)/i.test(varName)) continue;
+      }
+
+      // Skip VG1005 (.or() filter injection) when all interpolated variables are
+      // server-verified auth IDs (user.id, session.user.id, auth.uid, currentUser.id)
+      if (rule.id === "VG1005" && codeHasAuthSession) {
+        // The regex match ends at `${` — grab the full template literal from code
+        const orStart = match.index;
+        const backtickIdx = code.indexOf('`', orStart);
+        if (backtickIdx !== -1) {
+          const closingBacktick = code.indexOf('`', backtickIdx + 1);
+          if (closingBacktick !== -1) {
+            const fullTemplate = code.substring(backtickIdx, closingBacktick + 1);
+            const interpolations = [...fullTemplate.matchAll(/\$\{([^}]+)\}/g)].map(m => m[1].trim());
+            const safeAuthPattern = /^(?:user\.id|user\?\.id|session\.user\.id|session\.user\?\.id|currentUser\.id|currentUser\?\.id|auth\.uid|auth\?\.uid|session\.uid|session\?\.uid)$/;
+            if (interpolations.length > 0 && interpolations.every(v => safeAuthPattern.test(v))) continue;
+          }
+        }
       }
 
       // Skip VG903 React version in peerDependencies sections

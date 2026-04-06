@@ -31,6 +31,8 @@ function printUsage(): void {
     npx guardvibe explain <ruleId>   Get detailed remediation guidance for a rule
     npx guardvibe fix <file>         Get security fix suggestions for a file
     npx guardvibe check-cmd "<cmd>"  Check if a shell command is safe to execute
+    npx guardvibe auth-coverage [path]  Auth coverage analysis (Next.js routes)
+    npx guardvibe compliance [path]     Compliance report (--framework SOC2|GDPR|...)
     npx guardvibe init <platform>    Setup MCP server configuration
     npx guardvibe hook install       Install pre-commit security hook
     npx guardvibe hook uninstall     Remove pre-commit security hook
@@ -142,6 +144,12 @@ async function main(): Promise<void> {
   } else if (command === "check-cmd") {
     const { runCheckCmd } = await import("./cli/check-cmd.js");
     await runCheckCmd(subArgs);
+  } else if (command === "auth-coverage") {
+    const { runAuthCoverage } = await import("./cli/auth-coverage.js");
+    await runAuthCoverage(subArgs);
+  } else if (command === "compliance") {
+    const { runCompliance } = await import("./cli/compliance.js");
+    await runCompliance(subArgs);
   } else {
     console.error(`  Unknown command: ${command}`);
     printUsage();

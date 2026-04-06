@@ -32,6 +32,27 @@ describe("AI Benchmark — Phase 1 Rules", () => {
         "VG1005"
       ));
     });
+
+    it("allows server-verified user.id from supabase.auth.getUser()", () => {
+      assert(!hasRule(
+        `const { data: { user } } = await supabase.auth.getUser();\nconst posts = await supabase.from('posts').select('*').or(\`author_id.eq.\${user.id}\`);`,
+        "VG1005"
+      ));
+    });
+
+    it("allows session.user.id from getSession()", () => {
+      assert(!hasRule(
+        `const { data: { session } } = await supabase.auth.getSession();\nawait supabase.from('messages').select('*').or(\`sender_id.eq.\${session.user.id},receiver_id.eq.\${session.user.id}\`);`,
+        "VG1005"
+      ));
+    });
+
+    it("still detects user input in .or() even with auth in same file", () => {
+      assert(hasRule(
+        `const { data: { user } } = await supabase.auth.getUser();\nconst filter = req.query.filter;\nawait supabase.from('posts').select('*').or(\`status.eq.\${filter}\`);`,
+        "VG1005"
+      ));
+    });
   });
 
   // =====================================================
