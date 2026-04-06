@@ -80,7 +80,13 @@ export async function scanDependencies(manifestPath: string, format: "markdown" 
       }
     }
     return JSON.stringify({
-      summary: { total: packages.length, vulnerable: criticalPackages.length, ...sevCounts },
+      summary: {
+        total: packages.length,
+        vulnerable: criticalPackages.length,
+        vulnerablePackages: criticalPackages.length,
+        totalAdvisories: totalVulns,
+        ...sevCounts,
+      },
       packages: pkgResults,
     });
   }

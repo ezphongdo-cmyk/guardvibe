@@ -75,12 +75,40 @@ export function complianceReport(
     const high = relevant.filter(f => f.rule.severity === "high").length;
     const medium = relevant.filter(f => f.rule.severity === "medium").length;
 
+    // Count controls that have zero findings as "passed"
+    const totalControls = controlMap.size;
+    const failedControls = totalControls; // all mapped controls have findings
+    const passedControls = 0; // controls without findings are not in the map
+    const complianceScore = totalControls === 0 ? 100 : Math.round((passedControls / totalControls) * 100);
+
+    // Flatten all findings, sort by severity, limit to top 50
+    const severityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+    const allFindingsFlat = relevant
+      .map(f => ({
+        id: f.rule.id, name: f.rule.name, severity: f.rule.severity,
+        file: f.filePath, line: f.line,
+        exploit: f.rule.exploit, audit: f.rule.audit,
+      }))
+      .sort((a, b) => (severityOrder[a.severity] ?? 4) - (severityOrder[b.severity] ?? 4));
+
+    const MAX_JSON_FINDINGS = 50;
+    const truncated = allFindingsFlat.length > MAX_JSON_FINDINGS;
+    const topFindings = allFindingsFlat.slice(0, MAX_JSON_FINDINGS);
+
     return JSON.stringify({
       summary: {
-        framework, total: relevant.length, controls: controlMap.size,
-        critical, high, medium, mode,
+        framework,
+        totalControls,
+        passedControls,
+        failedControls,
+        totalFindings: relevant.length,
+        critical, high, medium,
+        complianceScore,
+        mode,
       },
       controls,
+      findings: topFindings,
+      ...(truncated ? { truncation: { shown: MAX_JSON_FINDINGS, total: allFindingsFlat.length, note: "Sorted by severity. Use scan_file on individual files for full details." } } : {}),
     });
   }
 

@@ -28,6 +28,9 @@ function printUsage(): void {
     npx guardvibe check <file>       Scan a single file for security issues
     npx guardvibe doctor [path]      Run host security audit
     npx guardvibe audit [path]       Full security audit with PASS/FAIL verdict
+    npx guardvibe explain <ruleId>   Get detailed remediation guidance for a rule
+    npx guardvibe fix <file>         Get security fix suggestions for a file
+    npx guardvibe check-cmd "<cmd>"  Check if a shell command is safe to execute
     npx guardvibe init <platform>    Setup MCP server configuration
     npx guardvibe hook install       Install pre-commit security hook
     npx guardvibe hook uninstall     Remove pre-commit security hook
@@ -130,6 +133,15 @@ async function main(): Promise<void> {
   } else if (command === "audit") {
     const { runAudit } = await import("./cli/audit.js");
     await runAudit(subArgs);
+  } else if (command === "explain") {
+    const { runExplain } = await import("./cli/explain.js");
+    await runExplain(subArgs);
+  } else if (command === "fix") {
+    const { runFix } = await import("./cli/fix.js");
+    await runFix(subArgs);
+  } else if (command === "check-cmd") {
+    const { runCheckCmd } = await import("./cli/check-cmd.js");
+    await runCheckCmd(subArgs);
   } else {
     console.error(`  Unknown command: ${command}`);
     printUsage();
