@@ -289,7 +289,7 @@ export async function runFullAudit(
   const totalHigh = sections.reduce((s, sec) => s + sec.high, 0);
   const totalMedium = sections.reduce((s, sec) => s + sec.medium, 0);
   const totalFindings = sections.reduce((s, sec) => s + sec.findings, 0);
-  const rulesApplied = rules.length > 0 ? rules.length : 334;
+  const rulesApplied = rules.length > 0 ? rules.length : 335;
 
   const verdict = computeVerdict(totalCritical, totalHigh, totalMedium);
   const coverage = computeCoverage(filesScanned, filesSkipped, rulesApplied);

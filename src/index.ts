@@ -62,7 +62,7 @@ function mergeStatsIntoOutput(results: string, summary: string, format: string):
 const server = new McpServer({
   name: "guardvibe",
   version: pkg.version,
-  description: "Security MCP for vibe coding — single source of truth for AI assistants. 334 security rules and 34 tools. Use full_audit for a comprehensive PASS/FAIL/WARN verdict with deterministic result hash, coverage %, and unified report across code, secrets, dependencies, config, taint analysis, and auth coverage. Same code = same hash = same results regardless of which AI assistant runs it. Covers OWASP, Next.js, Supabase, Stripe, Clerk, Prisma, Hono, AI SDK, MCP server security, host hardening. Maps to SOC2, PCI-DSS, HIPAA, GDPR, ISO27001, EU AI Act. Runs 100% locally with zero configuration.",
+  description: "Security MCP for vibe coding — single source of truth for AI assistants. 335 security rules and 34 tools. Use full_audit for a comprehensive PASS/FAIL/WARN verdict with deterministic result hash, coverage %, and unified report across code, secrets, dependencies, config, taint analysis, and auth coverage. Same code = same hash = same results regardless of which AI assistant runs it. Covers OWASP, Next.js, Supabase, Stripe, Clerk, Prisma, Hono, AI SDK, MCP server security, host hardening. Maps to SOC2, PCI-DSS, HIPAA, GDPR, ISO27001, EU AI Act. Runs 100% locally with zero configuration.",
 });
 
 // Tool 1: Analyze code for security vulnerabilities
@@ -1040,7 +1040,7 @@ server.tool(
 // Tool 33: Full audit — single source of truth
 server.tool(
   "full_audit",
-  "Single command that runs ALL checks: code scan (334 rules), secret detection, dependency CVEs, config audit, taint analysis, and auth coverage. Returns PASS/FAIL/WARN verdict with deterministic hash. Use this for comprehensive security assessment — no need to call individual tools separately. Example: full_audit({path: '.'})",
+  "Single command that runs ALL checks: code scan (335 rules), secret detection, dependency CVEs, config audit, taint analysis, and auth coverage. Returns PASS/FAIL/WARN verdict with deterministic hash. Use this for comprehensive security assessment — no need to call individual tools separately. Example: full_audit({path: '.'})",
   {
     path: z.string().default(".").describe("Project root directory"),
     format: z.enum(["markdown", "json"]).default("markdown").describe("Output format"),

@@ -137,6 +137,21 @@ export const authRules: SecurityRule[] = [
       '// WRONG: <ClientComponent user={user} /> (leaks privateMetadata)\n// CORRECT: pick only needed fields\nconst user = await currentUser();\nconst safeUser = { id: user.id, name: user.firstName };\nreturn <ClientComponent user={safeUser} />;',
     compliance: ["SOC2:CC6.1"],
   },
+  {
+    id: "VG430",
+    name: "Clerk SSRF via clerkFrontendApiProxy",
+    severity: "critical",
+    owasp: "A10:2025 Server-Side Request Forgery",
+    description:
+      "clerkFrontendApiProxy is a deprecated Clerk option that proxies frontend API requests through your backend. If present, attackers can craft requests to reach internal services via your server. This was deprecated in @clerk/nextjs v4 and removed in v5. Its presence indicates an outdated, vulnerable Clerk setup.",
+    pattern:
+      /clerkFrontendApiProxy|CLERK_FRONTEND_API_PROXY|frontendApiProxy/g,
+    languages: ["javascript", "typescript", "json", "shell"],
+    fix: "Remove clerkFrontendApiProxy from your Clerk config and environment variables. Upgrade to @clerk/nextjs v5+ which removed this option entirely. Use clerkMiddleware() instead of the legacy authMiddleware().",
+    fixCode:
+      '// DANGEROUS — enables SSRF through your backend:\n// clerkFrontendApiProxy: "/api/__clerk"\n// CLERK_FRONTEND_API_PROXY=/api/__clerk\n\n// SAFE — remove the proxy, upgrade to v5+\n// middleware.ts\nimport { clerkMiddleware } from "@clerk/nextjs/server";\nexport default clerkMiddleware();',
+    compliance: ["SOC2:CC6.6", "SOC2:CC7.1"],
+  },
 
   // Supabase Auth specific rules
   {

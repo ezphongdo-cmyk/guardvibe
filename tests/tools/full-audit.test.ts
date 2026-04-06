@@ -32,21 +32,21 @@ describe("full-audit", () => {
 
   describe("computeCoverage", () => {
     it("calculates correct percentage", () => {
-      const cov = computeCoverage(80, 20, 334);
+      const cov = computeCoverage(80, 20, 335);
       assert.equal(cov.filesScanned, 80);
       assert.equal(cov.filesSkipped, 20);
       assert.equal(cov.totalFiles, 100);
       assert.equal(cov.coveragePercent, 80);
-      assert.equal(cov.rulesApplied, 334);
+      assert.equal(cov.rulesApplied, 335);
     });
 
     it("handles 100% coverage", () => {
-      const cov = computeCoverage(50, 0, 334);
+      const cov = computeCoverage(50, 0, 335);
       assert.equal(cov.coveragePercent, 100);
     });
 
     it("handles 0 files", () => {
-      const cov = computeCoverage(0, 0, 334);
+      const cov = computeCoverage(0, 0, 335);
       assert.equal(cov.coveragePercent, 0);
     });
   });
@@ -211,7 +211,7 @@ describe("full-audit", () => {
         verdict: "FAIL",
         score: 45,
         grade: "D",
-        coverage: { filesScanned: 10, filesSkipped: 2, totalFiles: 12, coveragePercent: 83, rulesApplied: 334 },
+        coverage: { filesScanned: 10, filesSkipped: 2, totalFiles: 12, coveragePercent: 83, rulesApplied: 335 },
         resultHash: "abc123def456gh78",
         timestamp: new Date().toISOString(),
         sections: [{ name: "code", status: "ok", findings: 3, critical: 1, high: 1, medium: 1, details: "3 issues" }],

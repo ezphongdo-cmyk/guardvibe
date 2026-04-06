@@ -118,6 +118,22 @@ describe("Auth Rules", () => {
     });
   });
 
+  // VG430 - Clerk SSRF via clerkFrontendApiProxy
+  describe("VG430 - Clerk SSRF via clerkFrontendApiProxy", () => {
+    it("detects clerkFrontendApiProxy in config", () => {
+      testRule("VG430", 'clerkFrontendApiProxy: "/api/__clerk"', true);
+    });
+    it("detects CLERK_FRONTEND_API_PROXY env var", () => {
+      testRule("VG430", "CLERK_FRONTEND_API_PROXY=/api/__clerk", true);
+    });
+    it("detects frontendApiProxy option", () => {
+      testRule("VG430", 'frontendApiProxy: "/api/clerk-proxy"', true);
+    });
+    it("ignores normal Clerk middleware", () => {
+      testRule("VG430", 'import { clerkMiddleware } from "@clerk/nextjs/server";', false);
+    });
+  });
+
   // VG440 - Supabase Auth Signup Without Email Confirmation
   describe("VG440 - Supabase Signup Without Email Confirmation", () => {
     it("detects signUp without emailRedirectTo", () => {
