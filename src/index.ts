@@ -519,12 +519,12 @@ server.tool(
           if (stat.size > 100_000) continue;
           try {
             const content = readFileSync(full, "utf-8");
-            const relPath = full.replace(resolvePath(path) + "/", "");
+            const relPath = full.replace(resolvePath(path!) + "/", "");
             jsFiles.push({ path: relPath, content });
           } catch { /* skip unreadable */ }
         }
       }
-      walk(resolvePath(path));
+      walk(resolvePath(path!));
       analysisFiles = jsFiles;
     }
     const { crossFileFindings, perFileFindings } = analyzeCrossFileTaint(analysisFiles);
@@ -985,12 +985,12 @@ server.tool(
           if (stat.size > 100_000) continue;
           try {
             const content = readFileSync(full, "utf-8");
-            const relPath = full.replace(resolvePath(path) + "/", "");
+            const relPath = full.replace(resolvePath(path!) + "/", "");
             jsFiles.push({ path: relPath, content });
           } catch { /* skip unreadable */ }
         }
       }
-      walk(resolvePath(path));
+      walk(resolvePath(path!));
 
       const routeFiles = jsFiles.filter(f => /\/(route|page)\.(ts|tsx|js|jsx)$/.test(f.path));
       const layoutFiles = jsFiles.filter(f => /\/layout\.(ts|tsx|js|jsx)$/.test(f.path));
