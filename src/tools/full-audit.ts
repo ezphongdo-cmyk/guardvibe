@@ -330,11 +330,15 @@ export async function runFullAudit(
 // --- Formatter ---
 
 /**
- * Format audit result as markdown or JSON.
+ * Format audit result as markdown, JSON, or terminal-friendly output.
  */
-export function formatAuditResult(result: AuditResult, format: "markdown" | "json"): string {
+export function formatAuditResult(result: AuditResult, format: "markdown" | "json" | "terminal"): string {
   if (format === "json") {
     return JSON.stringify(result);
+  }
+
+  if (format === "terminal") {
+    return formatTerminal(result);
   }
 
   const verdictLabel: Record<AuditVerdict, string> = {
@@ -405,6 +409,67 @@ export function formatAuditResult(result: AuditResult, format: "markdown" | "jso
   lines.push(`---`);
   lines.push(`Timestamp: ${result.timestamp}`);
   lines.push(`Result hash: \`${result.resultHash}\` (same code + same GuardVibe version = same hash)`);
+
+  return lines.join("\n");
+}
+
+// --- Terminal-friendly formatter ---
+
+function formatTerminal(result: AuditResult): string {
+  const R = "\x1b[31m";  // red
+  const G = "\x1b[32m";  // green
+  const Y = "\x1b[33m";  // yellow
+  const B = "\x1b[1m";   // bold
+  const D = "\x1b[2m";   // dim
+  const X = "\x1b[0m";   // reset
+
+  const verdictColor = result.verdict === "PASS" ? G : result.verdict === "WARN" ? Y : R;
+  const scoreBar = (() => {
+    const width = 20;
+    const filled = Math.round((result.score / 100) * width);
+    const bar = "\u2588".repeat(filled) + "\u2591".repeat(width - filled);
+    const color = result.score >= 75 ? G : result.score >= 50 ? Y : R;
+    return `${color}${bar}${X}`;
+  })();
+
+  const lines = [
+    ``,
+    `  ${B}GuardVibe Full Audit Report${X}`,
+    ``,
+    `  ${verdictColor}${B}${result.verdict}${X}  ${verdictColor}${result.verdict === "PASS" ? "Project verified secure" : result.verdict === "WARN" ? "High severity issues found" : "Critical security issues detected"}${X}`,
+    ``,
+    `  Score  ${scoreBar}  ${B}${result.grade}${X} ${D}(${result.score}/100)${X}`,
+    ``,
+    `  ${B}Findings${X}`,
+    `  ${R}${B}${result.summary.critical}${X} critical  ${Y}${B}${result.summary.high}${X} high  ${D}${result.summary.medium} medium${X}  ${D}(${result.summary.totalFindings} total)${X}`,
+    ``,
+    `  ${B}Sections${X}`,
+  ];
+
+  const sectionIcon: Record<string, string> = { ok: `${G}\u2714${X}`, error: `${R}\u2718${X}`, skipped: `${D}\u2500${X}` };
+
+  for (const s of result.sections) {
+    const icon = sectionIcon[s.status] ?? s.status;
+    const count = s.findings > 0 ? `${s.findings}` : `${D}0${X}`;
+    lines.push(`  ${icon} ${s.name.padEnd(14)} ${count.padStart(4)}  ${D}${s.details}${X}`);
+  }
+
+  lines.push(``);
+  lines.push(`  ${B}Coverage${X}`);
+  lines.push(`  ${result.coverage.filesScanned} files scanned  ${D}${result.coverage.coveragePercent}% coverage  ${result.coverage.rulesApplied} rules${X}`);
+
+  if (result.actionItems.length > 0) {
+    lines.push(``);
+    lines.push(`  ${B}Action Items${X}`);
+    for (const item of result.actionItems) {
+      const color = item.includes("critical") ? R : item.includes("high") ? Y : D;
+      lines.push(`  ${color}\u25B8${X} ${item}`);
+    }
+  }
+
+  lines.push(``);
+  lines.push(`  ${D}Hash: ${result.resultHash}  |  ${result.timestamp.slice(0, 19)}${X}`);
+  lines.push(``);
 
   return lines.join("\n");
 }

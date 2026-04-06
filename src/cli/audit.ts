@@ -11,14 +11,20 @@ import { runFullAudit, formatAuditResult } from "../tools/full-audit.js";
 export async function runAudit(args: string[]): Promise<void> {
   const { flags, positional } = parseArgs(args);
   const targetPath = resolve(positional[0] ?? ".");
-  const format = validateFormat(flags) as "markdown" | "json";
+  const rawFormat = validateFormat(flags);
   const outputFile = getOutputPath(flags);
   const failOn = getStringFlag(flags, "fail-on") ?? "critical";
   const skipDeps = flags["skip-deps"] === true;
   const skipSecrets = flags["skip-secrets"] === true;
 
+  // Terminal format by default when outputting to TTY, unless --format is specified
+  const isTerminal = !outputFile && process.stdout.isTTY && !flags["format"];
+  const format = isTerminal ? "terminal" as const : rawFormat as "markdown" | "json";
+
   const result = await runFullAudit(targetPath, { skipDeps, skipSecrets });
   const output = formatAuditResult(result, format);
+  // For shouldFail, always use JSON-parseable format
+  const failCheckOutput = formatAuditResult(result, "json");
 
   if (outputFile) {
     const dir = dirname(outputFile);
@@ -34,5 +40,5 @@ export async function runAudit(args: string[]): Promise<void> {
   // Print result hash to stderr for CI piping
   console.error(`result-hash: ${result.resultHash}`);
 
-  if (shouldFail(output, failOn)) process.exit(1);
+  if (shouldFail(failCheckOutput, failOn)) process.exit(1);
 }
