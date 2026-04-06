@@ -155,6 +155,16 @@ export function scanDirectory(
     fileHashes,
   };
 
+  // File ranking — always included in JSON, even when truncated
+  const fileRankingMap = new Map<string, number>();
+  for (const r of scanResults) {
+    fileRankingMap.set(r.path, r.findings.length);
+  }
+  const fileRanking = Array.from(fileRankingMap.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([file, count]) => ({ file, findingCount: count }));
+
   // Scoring
   const allFindings = scanResults.flatMap(r => r.findings);
   const totalCritical = allFindings.filter(f => f.rule.severity === "critical").length;
@@ -222,6 +232,7 @@ export function scanDirectory(
         },
       },
       metadata,
+      fileRanking,
       findings: limitedFindings.map(f => ({
         id: f.rule.id, name: f.rule.name, severity: f.rule.severity,
         owasp: f.rule.owasp, line: f.line, match: f.match, file: (f as any).file,

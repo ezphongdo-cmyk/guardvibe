@@ -47,6 +47,18 @@ import { analyzeAuthCoverage, formatAuthCoverage } from "./tools/auth-coverage.j
 import { buildDeepScanPrompt, parseDeepScanResult, formatDeepScanFindings, callLLM } from "./tools/deep-scan.js";
 import { runFullAudit, formatAuditResult } from "./tools/full-audit.js";
 
+// Helper: merge stats summary into JSON output instead of concatenating two JSON objects
+function mergeStatsIntoOutput(results: string, summary: string, format: string): string {
+  if (format === "json" && summary) {
+    try {
+      const parsed = JSON.parse(results);
+      const stats = JSON.parse(summary);
+      return JSON.stringify({ ...parsed, _meta: stats.guardvibeStats ?? stats });
+    } catch { /* fall through */ }
+  }
+  return results + summary;
+}
+
 const server = new McpServer({
   name: "guardvibe",
   version: pkg.version,
@@ -56,7 +68,7 @@ const server = new McpServer({
 // Tool 1: Analyze code for security vulnerabilities
 server.tool(
   "check_code",
-  "Analyze code for security vulnerabilities (OWASP Top 10, XSS, SQL injection, insecure patterns). Use this when reviewing or writing code to catch security issues early.",
+  "Analyze inline code for security vulnerabilities (OWASP Top 10, XSS, SQL injection, insecure patterns). Pass code as a string parameter. For scanning files on disk, use scan_file instead. Example: check_code({code: 'app.get(...)', language: 'javascript'})",
   {
     code: z.string().describe("The code snippet to analyze"),
     language: z
@@ -76,7 +88,7 @@ server.tool(
     recordScan(cwd, { toolName: "check_code", filesScanned: 1, findings: findings.map(f => ({ severity: f.rule.severity, ruleId: f.rule.id })) });
     const summary = getSummaryLine(cwd, findings.length, format);
     return {
-      content: [{ type: "text", text: results + summary }],
+      content: [{ type: "text", text: mergeStatsIntoOutput(results, summary, format) }],
     };
   }
 );
@@ -115,7 +127,7 @@ server.tool(
     }
     const summary = getSummaryLine(cwd, findingCount, format);
     return {
-      content: [{ type: "text", text: results + summary }],
+      content: [{ type: "text", text: mergeStatsIntoOutput(results, summary, format) }],
     };
   }
 );
@@ -181,7 +193,7 @@ server.tool(
 // Tool 5: Scan directory for security vulnerabilities (filesystem-native)
 server.tool(
   "scan_directory",
-  "Scan an entire project directory for security vulnerabilities. Reads files directly from the filesystem — no need to pass file contents. Returns a security score (A-F) and detailed findings. Includes scan metadata (ID, timestamp, duration, file hashes) for audit trails. Use baseline to compare with a previous scan.",
+  "Scan all files in a directory on disk for security vulnerabilities. Pass a directory path — reads files from filesystem. Returns security score (A-F) and findings. Results may be truncated for large projects — check fileRanking in JSON output for top files. Example: scan_directory({path: './src'})",
   {
     path: z.string().describe("Directory path to scan (e.g. './src', '.')"),
     recursive: z.boolean().optional().default(true).describe("Scan subdirectories"),
@@ -209,7 +221,7 @@ server.tool(
       recordScan(root, { toolName: "scan_directory", filesScanned: 0, findings: [] });
     }
     const summary = getSummaryLine(root, findingCount, format);
-    return { content: [{ type: "text", text: results + summary }] };
+    return { content: [{ type: "text", text: mergeStatsIntoOutput(results, summary, format) }] };
   }
 );
 
@@ -287,14 +299,14 @@ server.tool(
       recordScan(cwd, { toolName: "scan_staged", filesScanned: 0, findings: [] });
     }
     const summary = getSummaryLine(cwd, findingCount, format);
-    return { content: [{ type: "text", text: results + summary }] };
+    return { content: [{ type: "text", text: mergeStatsIntoOutput(results, summary, format) }] };
   }
 );
 
 // Tool 9: Generate compliance-focused security report
 server.tool(
   "compliance_report",
-  "Map security scan findings to compliance framework controls (SOC2, PCI-DSS, HIPAA, GDPR, ISO27001, EUAIACT). Scans a directory and groups code-level security issues by the compliance control they relate to. Includes exploit scenarios and remediation evidence for each finding. Use mode=executive for a risk summary. Note: this maps code vulnerabilities to controls — it does not perform a compliance audit or replace professional assessment.",
+  "Map security findings to compliance controls (SOC2, PCI-DSS, HIPAA, GDPR, ISO27001, EUAIACT). Scans a directory and groups issues by control. Output includes a summary section at the top; for large projects, findings are truncated to top 50. Use mode=executive for C-level summary. Example: compliance_report({path: '.', framework: 'SOC2'})",
   {
     path: z.string().describe("Directory to scan"),
     framework: z.enum(["SOC2", "PCI-DSS", "HIPAA", "GDPR", "ISO27001", "EUAIACT", "all"]).describe("Compliance framework"),
@@ -344,7 +356,7 @@ server.tool(
 // Tool 12: Auto-fix security vulnerabilities
 server.tool(
   "fix_code",
-  "Analyze code for security vulnerabilities and return fix suggestions with concrete patches. The AI agent can apply these patches to automatically fix issues. Returns structured fix data including before/after code, severity, and line numbers.",
+  "Pass vulnerable code as a string and get fix suggestions with before/after patches. Returns structured edit instructions (line numbers, severity, confidence). Use verify_fix afterwards to confirm the fix resolved the issue. Example: fix_code({code: '...', language: 'typescript'})",
   {
     code: z.string().describe("The code snippet to analyze and fix"),
     language: z
@@ -374,7 +386,7 @@ server.tool(
 // Tool 13: Cross-file configuration security audit
 server.tool(
   "audit_config",
-  "Audit project configuration files (next.config, middleware/proxy, .env, vercel.json) together for cross-file security issues. Detects gaps that single-file scanning misses: missing security headers, unprotected routes, exposed secrets, middleware/route mismatches.",
+  "Audit application config files (next.config, middleware, .env, vercel.json) for cross-file security gaps: missing headers, unprotected routes, exposed secrets. NOT the same as guardvibe_doctor which checks AI host security (MCP configs, hooks). Example: audit_config({path: '.'})",
   {
     path: z.string().describe("Project root directory to audit"),
     format: z.enum(["markdown", "json"]).default("markdown").describe("Output format"),
@@ -470,8 +482,9 @@ server.tool(
 // Tool 18b: Cross-File Taint/Dataflow Analysis
 server.tool(
   "analyze_cross_file_dataflow",
-  "Track user input flowing across module boundaries — detects injection vulnerabilities that span multiple files. Resolves imports/exports, builds a module graph, and follows tainted data from HTTP handlers through helper functions to dangerous sinks (SQL, eval, redirect, file ops). Pass all related files for best results.",
+  "Track user input flowing across module boundaries — detects injection vulnerabilities spanning multiple files. Pass files array with file contents. For single-file analysis, use analyze_dataflow instead. Example: analyze_cross_file_dataflow({files: [{path: 'src/api.ts', content: '...'}, {path: 'src/db.ts', content: '...'}]})",
   {
+    path: z.string().optional().describe("Project directory path. When provided, auto-discovers all JS/TS files — no need to pass file contents manually."),
     files: z
       .array(
         z.object({
@@ -479,11 +492,42 @@ server.tool(
           content: z.string().describe("File source code"),
         })
       )
-      .describe("List of files to analyze: [{path, content}]"),
+      .default([])
+      .describe("List of files to analyze (ignored when path is provided)"),
     format: z.enum(["markdown", "json"]).default("markdown").describe("Output format"),
   },
-  async ({ files, format }) => {
-    const { crossFileFindings, perFileFindings } = analyzeCrossFileTaint(files);
+  async ({ path, files, format }) => {
+    let analysisFiles = files;
+    if (path) {
+      const { readdirSync, readFileSync, statSync } = await import("fs");
+      const { resolve: resolvePath } = await import("path");
+
+      const jsFiles: Array<{path: string; content: string}> = [];
+      const skip = new Set(["node_modules", ".git", ".next", "build", "dist", ".turbo", "coverage"]);
+      function walk(d: string) {
+        if (jsFiles.length >= 500) return;
+        let entries: string[];
+        try { entries = readdirSync(d); } catch { return; }
+        for (const entry of entries) {
+          if (jsFiles.length >= 500) return;
+          if (skip.has(entry)) continue;
+          const full = resolvePath(d, entry);
+          let stat;
+          try { stat = statSync(full); } catch { continue; }
+          if (stat.isDirectory()) { walk(full); continue; }
+          if (!/\.(ts|tsx|js|jsx)$/.test(entry)) continue;
+          if (stat.size > 100_000) continue;
+          try {
+            const content = readFileSync(full, "utf-8");
+            const relPath = full.replace(resolvePath(path) + "/", "");
+            jsFiles.push({ path: relPath, content });
+          } catch { /* skip unreadable */ }
+        }
+      }
+      walk(resolvePath(path));
+      analysisFiles = jsFiles;
+    }
+    const { crossFileFindings, perFileFindings } = analyzeCrossFileTaint(analysisFiles);
     const total = crossFileFindings.length + Array.from(perFileFindings.values()).reduce((sum, f) => sum + f.length, 0);
     if (total === 0) {
       if (format === "json") return { content: [{ type: "text", text: JSON.stringify({ summary: { crossFileFlows: 0, perFileFlows: 0, total: 0, critical: 0, high: 0, medium: 0 }, crossFileFindings: [], perFileFindings: [] }) }] };
@@ -543,7 +587,7 @@ server.tool(
 // Tool 22: Explain Remediation
 server.tool(
   "explain_remediation",
-  "Deep explanation of a security finding: why it's risky, real-world impact, exploit scenario, minimum fix, secure alternative, breaking risk assessment, and test strategy. Helps agents apply fixes correctly.",
+  "Pass a GuardVibe rule ID (e.g. VG154) to get a detailed explanation: risk assessment, exploit scenario, minimum fix, secure alternative, and test strategy. Optionally pass the affected code snippet for context-aware guidance. Example: explain_remediation({rule_id: 'VG402'})",
   {
     rule_id: z.string().describe("GuardVibe rule ID (e.g. VG001, VG402)"),
     code: z.string().optional().describe("Affected code snippet for context"),
@@ -559,7 +603,7 @@ server.tool(
 // Tool 23: Quick file scan — designed for real-time integration
 server.tool(
   "scan_file",
-  "Scan a single file from disk for security vulnerabilities. Returns only findings (no boilerplate). Designed for real-time use: call this after editing a file to catch security issues immediately. Lightweight and fast — reads the file, detects language, and returns findings in JSON.",
+  "Scan a single file on disk by path for security vulnerabilities. Pass a file path — the tool reads the file itself. For inline code snippets, use check_code instead. Example: scan_file({file_path: 'src/api/route.ts'})",
   {
     file_path: z.string().describe("Absolute or relative path to the file to scan"),
     format: z.enum(["markdown", "json"]).default("json").describe("Output format"),
@@ -603,10 +647,10 @@ server.tool(
         confidence: f.confidence,
         effort: f.effort,
       })).filter((f: { edit?: unknown }) => f.edit);
-      return { content: [{ type: "text", text: JSON.stringify(parsed) + summary }] };
+      return { content: [{ type: "text", text: mergeStatsIntoOutput(JSON.stringify(parsed), summary, format) }] };
     }
 
-    return { content: [{ type: "text", text: result + summary }] };
+    return { content: [{ type: "text", text: mergeStatsIntoOutput(result, summary, format) }] };
   }
 );
 
@@ -675,10 +719,10 @@ server.tool(
       const critical = allFindings.filter(f => f.severity === "critical").length;
       const high = allFindings.filter(f => f.severity === "high").length;
       const medium = allFindings.filter(f => f.severity === "medium").length;
-      return { content: [{ type: "text", text: JSON.stringify({
+      return { content: [{ type: "text", text: mergeStatsIntoOutput(JSON.stringify({
         summary: { total: allFindings.length, critical, high, medium, low: 0, blocked: critical > 0 || high > 0, changedFiles: changedFiles.length },
         findings: allFindings,
-      }) + statsSummary }] };
+      }), statsSummary, format) }] };
     }
 
     // Markdown
@@ -692,7 +736,7 @@ server.tool(
         lines.push(`- [${f.severity.toUpperCase()}] **${f.name}** (${f.id}) in \`${f.file}\`:${f.line} — ${f.fix}`);
       }
     }
-    return { content: [{ type: "text", text: lines.join("\n") + statsSummary }] };
+    return { content: [{ type: "text", text: mergeStatsIntoOutput(lines.join("\n"), statsSummary, format) }] };
   }
 );
 
@@ -751,7 +795,7 @@ server.tool(
 // Tool 28: Unified host hardening scanner (doctor)
 server.tool(
   "guardvibe_doctor",
-  "Comprehensive AI host security audit. Scans MCP configurations, hooks, environment variables, shell profiles, and permissions for known attack vectors (CVE-2025-59536 hook injection, CVE-2026-21852 base URL hijack, tool result injection, supply chain attacks). Reports trust state, verdict, and confidence for each finding. Supports allowlists via .guardviberc. Use scope=project (default) for project-only scan, scope=host to include shell profiles and global configs.",
+  "Check AI host security: MCP configurations, hooks, base URL hijacking, environment variable exposure. NOT the same as audit_config which checks application config files (next.config, .env, headers). Use scope=project (default) for project-only, scope=host to include shell profiles and global AI configs. Example: guardvibe_doctor({scope: 'project'})",
   {
     path: z.string().default(".").describe("Project root directory"),
     scope: z.enum(["project", "host", "full"]).default("project").describe("Scan scope: project (default, .claude.json + .cursor/ + .vscode/ + .env), host (+ shell profiles + global MCP configs), full (+ home dir configs)"),
@@ -783,7 +827,7 @@ server.tool(
 // Tool 30: Security workflow guide for AI agents
 server.tool(
   "security_workflow",
-  "Get the recommended GuardVibe security workflow for your current task. Returns which tools to call, in what order, and with what parameters. Use this when you're unsure which GuardVibe tool to use.",
+  "Get the recommended GuardVibe tool sequence for your current task. Returns which tools to call, in what order, and with what parameters. Use this when unsure which tool to use. Example: security_workflow({task: 'pre_commit'})",
   {
     task: z.enum([
       "writing_code",
@@ -797,7 +841,7 @@ server.tool(
       "publish_package",
       "security_audit",
       "incident_response",
-    ]).describe("What you are currently doing"),
+    ]).describe("Current task: writing_code (after edits), pre_commit (before commit), pr_review (reviewing PR), new_project (initial setup), fix_vulnerabilities (fixing known issues), compliance_mapping (audit against framework), dependency_check (check deps), merge_to_main (pre-merge gate), publish_package (pre-publish checks), security_audit (comprehensive audit), incident_response (post-breach investigation)"),
   },
   async ({ task }) => {
     const workflows: Record<string, object> = {
@@ -909,16 +953,54 @@ server.tool(
 // Tool 31: Auth coverage map
 server.tool(
   "auth_coverage",
-  "Analyze authentication coverage across all Next.js App Router routes. Enumerates API routes and pages, parses middleware matchers, detects auth guards (Clerk, NextAuth, Supabase, custom), and reports which routes are protected vs unprotected. Use this to find gaps in your auth layer.",
+  "Analyze authentication coverage across Next.js App Router routes. Detects auth guards (Clerk, NextAuth, Supabase, custom) and reports protected vs unprotected routes. Pass files array with route file contents and middleware content. Example: auth_coverage({files: [{path: 'app/api/users/route.ts', content: '...'}], middleware: '...'})",
   {
+    path: z.string().optional().describe("Project directory path. When provided, auto-discovers all route, page, layout, and middleware files — no need to pass file contents manually."),
     files: z.array(z.object({
       path: z.string().describe("File path relative to project root (e.g. app/api/users/route.ts)"),
       content: z.string().describe("File source code"),
-    })).describe("Route and page files from app/ directory"),
-    middleware: z.string().default("").describe("Content of middleware.ts file (empty if none)"),
+    })).default([]).describe("Route and page files from app/ directory (ignored when path is provided)"),
+    middleware: z.string().default("").describe("Content of middleware.ts file (ignored when path is provided)"),
     format: z.enum(["markdown", "json"]).default("markdown").describe("Output format"),
   },
-  async ({ files, middleware, format }) => {
+  async ({ path, files, middleware, format }) => {
+    if (path) {
+      const { readdirSync, readFileSync, statSync } = await import("fs");
+      const { resolve: resolvePath } = await import("path");
+
+      const jsFiles: Array<{path: string; content: string}> = [];
+      const skip = new Set(["node_modules", ".git", ".next", "build", "dist", ".turbo", "coverage"]);
+      function walk(d: string) {
+        if (jsFiles.length >= 500) return;
+        let entries: string[];
+        try { entries = readdirSync(d); } catch { return; }
+        for (const entry of entries) {
+          if (jsFiles.length >= 500) return;
+          if (skip.has(entry)) continue;
+          const full = resolvePath(d, entry);
+          let stat;
+          try { stat = statSync(full); } catch { continue; }
+          if (stat.isDirectory()) { walk(full); continue; }
+          if (!/\.(ts|tsx|js|jsx)$/.test(entry)) continue;
+          if (stat.size > 100_000) continue;
+          try {
+            const content = readFileSync(full, "utf-8");
+            const relPath = full.replace(resolvePath(path) + "/", "");
+            jsFiles.push({ path: relPath, content });
+          } catch { /* skip unreadable */ }
+        }
+      }
+      walk(resolvePath(path));
+
+      const routeFiles = jsFiles.filter(f => /\/(route|page)\.(ts|tsx|js|jsx)$/.test(f.path));
+      const layoutFiles = jsFiles.filter(f => /\/layout\.(ts|tsx|js|jsx)$/.test(f.path));
+      const middlewareFile = jsFiles.find(f => /middleware\.(ts|js)$/.test(f.path));
+
+      const report = analyzeAuthCoverage(routeFiles, middlewareFile?.content ?? "", layoutFiles);
+      const output = formatAuthCoverage(report, format);
+      return { content: [{ type: "text", text: output }] };
+    }
+
     const report = analyzeAuthCoverage(files, middleware);
     const output = formatAuthCoverage(report, format);
     return { content: [{ type: "text", text: output }] };
@@ -958,7 +1040,7 @@ server.tool(
 // Tool 33: Full audit — single source of truth
 server.tool(
   "full_audit",
-  "Single source of truth security audit. Runs ALL security checks in one call: code scan (334 rules), secret detection, dependency CVE check, config audit, cross-file taint analysis, and auth coverage mapping. Returns a deterministic PASS/FAIL/WARN verdict, unified score, coverage %, and a result hash (same code = same hash, always). Use this instead of running individual tools when you need a comprehensive security assessment. Trust the verdict — do not add speculative security concerns beyond what this tool reports.",
+  "Single command that runs ALL checks: code scan (334 rules), secret detection, dependency CVEs, config audit, taint analysis, and auth coverage. Returns PASS/FAIL/WARN verdict with deterministic hash. Use this for comprehensive security assessment — no need to call individual tools separately. Example: full_audit({path: '.'})",
   {
     path: z.string().default(".").describe("Project root directory"),
     format: z.enum(["markdown", "json"]).default("markdown").describe("Output format"),
