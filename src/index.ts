@@ -47,7 +47,7 @@ import { analyzeAuthCoverage, formatAuthCoverage } from "./tools/auth-coverage.j
 import { buildDeepScanPrompt, parseDeepScanResult, formatDeepScanFindings, callLLM } from "./tools/deep-scan.js";
 import { runFullAudit, formatAuditResult } from "./tools/full-audit.js";
 import { generateRemediationPlan, formatRemediationPlan } from "./tools/remediation-plan.js";
-import { verifyRemediation, formatRemediationVerification } from "./tools/verify-remediation.js";
+// verify-remediation logic is inline in the tool handler below
 
 // Helper: merge stats summary into JSON output instead of concatenating two JSON objects
 function mergeStatsIntoOutput(results: string, summary: string, format: string): string {
@@ -1101,10 +1101,6 @@ server.tool(
     // Run "before" audit to establish baseline, then "after" to compare
     // In practice, the AI should pass the before results, but we re-run for accuracy
     const beforeResult = await runFullAudit(projectPath);
-    // Since we can't store state between calls, we run the audit once
-    // and report the current state. The AI should compare this with their
-    // earlier remediation_plan to identify what was/wasn't addressed.
-    const afterResult = beforeResult; // Same snapshot — AI compares with their saved before
 
     // Build verification from current state
     const sections = beforeResult.sections.map(s => ({
