@@ -286,18 +286,21 @@ export async function runFullAudit(
     const parsed = safeJsonParse(configJson);
     if (parsed) {
       const counts = parseSectionCounts(parsed);
-      const configFindings: SectionFinding[] = (parsed.findings ?? []).map((f: Record<string, unknown>) => ({
+      // auditConfig uses "issues" key, not "findings"
+      const rawIssues = parsed.issues ?? parsed.findings ?? [];
+      const configFindings: SectionFinding[] = rawIssues.map((f: Record<string, unknown>) => ({
         ruleId: ((f.id ?? f.ruleId ?? "CONFIG") as string),
         severity: ((f.severity ?? "medium") as string),
-        file: ((f.file ?? "") as string),
+        file: (Array.isArray(f.files) && f.files.length > 0 ? f.files[0] : (f.file ?? "")) as string,
         line: ((f.line ?? 0) as number),
-        name: (f.name ?? f.description ?? "") as string,
-        description: (f.description ?? f.details ?? "") as string,
-        fix: (f.fix ?? f.remediation ?? "") as string,
+        name: (f.title ?? f.name ?? "") as string,
+        description: (f.description ?? "") as string,
+        fix: (f.fix ?? "") as string,
       }));
       sections.push({ name: "config", status: "ok", ...counts, details: counts.findings === 0 ? "Config secure" : `${counts.findings} config issue(s)`, sectionFindings: configFindings });
-      for (const f of parsed.findings ?? []) {
-        allFindings.push({ ruleId: f.id ?? f.ruleId ?? "CONFIG", severity: f.severity ?? "medium", file: f.file ?? "", line: f.line ?? 0 });
+      for (const f of rawIssues) {
+        const file = Array.isArray(f.files) && f.files.length > 0 ? f.files[0] : (f.file ?? "");
+        allFindings.push({ ruleId: f.id ?? f.ruleId ?? "CONFIG", severity: f.severity ?? "medium", file, line: f.line ?? 0 });
       }
     }
   } catch { sections.push({ name: "config", status: "error", findings: 0, critical: 0, high: 0, medium: 0, details: "No configs found" }); }
