@@ -83,7 +83,7 @@ export const nextjsRules: SecurityRule[] = [
     description:
       "next.config is missing important security headers (Content-Security-Policy, Strict-Transport-Security, X-Frame-Options).",
     pattern:
-      /(?:async\s+)?headers\s*\(\s*\)\s*\{(?:(?!X-Frame-Options|Strict-Transport-Security|Content-Security-Policy)[\s\S]){10,}?\}/g,
+      /(?:async\s+)?headers\s*\(\s*\)(?![\s\S]*(?:X-Frame-Options|Strict-Transport-Security|Content-Security-Policy))/g,
     languages: ["javascript", "typescript"],
     fix: "Add security headers in next.config.ts headers() function.",
     fixCode:

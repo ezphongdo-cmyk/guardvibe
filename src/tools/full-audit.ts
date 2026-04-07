@@ -440,6 +440,14 @@ export function formatAuditResult(result: AuditResult, format: "markdown" | "jso
         remediationPlan: {
           totalSectionsWithFindings: plan.length,
           warning: `MANDATORY: You must fix ALL ${plan.length} sections below. Do NOT fix only the code section and skip the rest. Work through each section in priority order. After completing ALL sections, call verify_remediation to confirm.`,
+          rules: [
+            "Do NOT dismiss findings as 'false positive' without running the section-specific tool first and verifying the finding is genuinely wrong.",
+            "Do NOT say 'npm audit is clean' to skip dependencies — GuardVibe uses the OSV database which may detect CVEs that npm audit misses.",
+            "Do NOT say 'already in .gitignore' to skip secrets — if GuardVibe detects secrets, they exist in the scanned files and must be removed or moved to env vars.",
+            "Do NOT skip auth-coverage by saying routes are 'intentionally public' — either add auth guards or add them to .guardviberc authExceptions so the scanner recognizes them.",
+            "After fixing each section, re-run the section-specific tool to confirm the finding count dropped. If it didn't drop, your fix didn't work.",
+            "Only call verify_remediation AFTER you have worked through ALL sections and confirmed each one improved.",
+          ],
           steps: plan,
         },
       });
@@ -523,6 +531,13 @@ export function formatAuditResult(result: AuditResult, format: "markdown" | "jso
       lines.push(`## Mandatory Remediation Plan`);
       lines.push(``);
       lines.push(`> **IMPORTANT: You MUST fix ALL ${plan.length} sections below. Do NOT fix only the code section and skip the rest. Work through each section in priority order. After completing ALL sections, call \`verify_remediation\` to confirm.**`);
+      lines.push(``);
+      lines.push(`**Rules:**`);
+      lines.push(`- Do NOT dismiss findings as "false positive" without running the section-specific tool first`);
+      lines.push(`- Do NOT say "npm audit is clean" to skip dependencies — GuardVibe uses OSV which may detect CVEs npm misses`);
+      lines.push(`- Do NOT say "already in .gitignore" to skip secrets — if detected, they exist in scanned files`);
+      lines.push(`- After fixing each section, re-run the section tool to confirm finding count dropped`);
+      lines.push(`- Only call verify_remediation AFTER all sections show improvement`);
       lines.push(``);
 
       for (const step of plan) {

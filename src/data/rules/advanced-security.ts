@@ -46,7 +46,7 @@ export const advancedSecurityRules: SecurityRule[] = [
     description:
       "API endpoint reads request body without explicit size limit. Note: Next.js/Vercel applies a default 4.5MB limit, so this is informational for those platforms. For custom servers, attackers can send large payloads to exhaust memory.",
     pattern:
-      /export\s+(?:async\s+)?function\s+(?:POST|PUT|PATCH)\s*\([^)]*\)\s*\{(?:(?!content-length|maxBodySize|limit|MAX_)[\s\S]){5,}?(?:req\.json|req\.text|req\.body|req\.formData|request\.json|request\.text)\s*\(\s*\)/g,
+      /export\s+(?:async\s+)?function\s+(?:POST|PUT|PATCH)\s*\([^)]*\)\s*\{(?:(?!content-length|maxBodySize|limit|MAX_|parseBody|checkBodySize|bodyParser|bodyLimit|sizeLimit)[\s\S]){5,}?(?:req\.json|req\.text|req\.body|req\.formData|request\.json|request\.text)\s*\(\s*\)/g,
     languages: ["javascript", "typescript"],
     fix: "Check Content-Length header before parsing body, or use a body parser with size limit.",
     fixCode:
@@ -246,7 +246,7 @@ export const advancedSecurityRules: SecurityRule[] = [
     description:
       "Security headers are configured but Referrer-Policy is missing. Without it, the full URL (including query parameters with tokens/IDs) is sent to external sites in the Referer header.",
     pattern:
-      /(?:async\s+)?headers\s*\(\s*\)\s*\{[\s\S]{10,}?(?:X-Frame-Options|Strict-Transport-Security|Content-Security-Policy)(?:(?!Referrer-Policy)[\s\S]){10,}?\}/g,
+      /(?:async\s+)?headers\s*\(\s*\)(?=[\s\S]*(?:X-Frame-Options|Strict-Transport-Security|Content-Security-Policy))(?![\s\S]*Referrer-Policy)/g,
     languages: ["javascript", "typescript"],
     fix: "Add Referrer-Policy: strict-origin-when-cross-origin to your security headers.",
     fixCode:
@@ -263,7 +263,7 @@ export const advancedSecurityRules: SecurityRule[] = [
     description:
       "Security headers are configured but Permissions-Policy is missing. Without it, embedded iframes and scripts can access camera, microphone, geolocation, and other sensitive browser APIs.",
     pattern:
-      /(?:async\s+)?headers\s*\(\s*\)\s*\{[\s\S]{10,}?(?:X-Frame-Options|Strict-Transport-Security|Content-Security-Policy)(?:(?!Permissions-Policy)[\s\S]){10,}?\}/g,
+      /(?:async\s+)?headers\s*\(\s*\)(?=[\s\S]*(?:X-Frame-Options|Strict-Transport-Security|Content-Security-Policy))(?![\s\S]*Permissions-Policy)/g,
     languages: ["javascript", "typescript"],
     fix: "Add Permissions-Policy header to restrict browser API access.",
     fixCode:
@@ -426,7 +426,7 @@ export const advancedSecurityRules: SecurityRule[] = [
     owasp: "A01:2025 Broken Access Control",
     description:
       "POST/PUT/PATCH/DELETE route handler performs database mutations without CSRF token verification. Cross-site requests from malicious pages can trick authenticated users into performing unwanted actions.",
-    pattern: /export\s+(?:async\s+)?function\s+(?:POST|PUT|PATCH|DELETE)\s*\([^)]*\)\s*\{(?:(?!csrf|csrfToken|CSRF|x-csrf|verifyCsrf|validateCsrf|anti.?forgery)[\s\S]){10,}?(?:\.create\s*\(|\.update\s*\(|\.delete\s*\(|\.insert\s*\(|\.upsert\s*\()/g,
+    pattern: /export\s+(?:async\s+)?function\s+(?:POST|PUT|PATCH|DELETE)\s*\([^)]*\)\s*\{(?:(?!csrf|csrfToken|CSRF|x-csrf|verifyCsrf|validateCsrf|anti.?forgery|requireAdmin|requireAuth|checkAuth|withAuth|protectRoute|authenticate|x-csrf-protection)[\s\S]){10,}?(?:\.create\s*\(|\.update\s*\(|\.delete\s*\(|\.insert\s*\(|\.upsert\s*\()/g,
     languages: ["javascript", "typescript"],
     fix: "Add CSRF token verification to state-changing endpoints.",
     fixCode:

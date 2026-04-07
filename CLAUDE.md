@@ -37,6 +37,11 @@ The 6 sections are: **secrets, code, dependencies, config, taint, auth-coverage*
 - Declare "0 critical findings" based on only the code section
 - Report the code section's score as the overall score
 - Say "remediation complete" without running `verify_remediation`
+- Dismiss findings as "false positive" or "scanner limitation" without running the section-specific tool first
+- Say "npm audit is clean" to skip dependencies — GuardVibe uses OSV database which detects different CVEs
+- Say "already in .gitignore" to skip secrets — if GuardVibe detects them, they exist in scanned files
+- Say routes are "intentionally public" to skip auth-coverage — add them to .guardviberc authExceptions instead
+- After each section fix, you MUST re-run the section tool and confirm the finding count actually dropped
 
 ### Comprehensive security check
 

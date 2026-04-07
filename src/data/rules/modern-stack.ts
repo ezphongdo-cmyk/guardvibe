@@ -320,7 +320,7 @@ export const modernStackRules: SecurityRule[] = [
     owasp: "A05:2025 Security Misconfiguration",
     description:
       "Next.js app does not set a Content-Security-Policy header. CSP is the strongest defense against XSS — without it, injected scripts run freely in your users' browsers.",
-    pattern: /(?:async\s+)?headers\s*\(\s*\)\s*\{(?:(?!Content-Security-Policy)[\s\S]){20,}?\}/g,
+    pattern: /(?:async\s+)?headers\s*\(\s*\)(?=[\s\S]*(?:X-Frame-Options|Strict-Transport-Security|X-Content-Type-Options))(?![\s\S]*Content-Security-Policy)/g,
     languages: ["javascript", "typescript"],
     fix: "Add a Content-Security-Policy header in next.config.ts headers().",
     fixCode:
@@ -564,7 +564,7 @@ export const modernStackRules: SecurityRule[] = [
     owasp: "A01:2025 Broken Access Control",
     description:
       "User-uploaded file's original filename is used directly for storage without sanitization. Attackers can use directory traversal (../../etc/passwd), null bytes (file.php%00.jpg), double extensions (file.jpg.exe), or Unicode tricks to overwrite files, bypass type checks, or achieve remote code execution.",
-    pattern: /(?:file\.name|originalname|filename|req\.file\.originalname|formData\.get\s*\(\s*['"]file['"])\s*[\s\S]{0,100}?(?:writeFile|createWriteStream|save|upload|putObject|mv\s*\(|rename|storage)/gi,
+    pattern: /(?:file\.name|originalname|req\.file\.originalname|formData\.get\s*\(\s*['"]file['"])(?:(?!randomUUID|uuid|nanoid|sanitize|safeFilename|safeName|allowedExt|allowedExtensions|\.replace\s*\(\s*\/\[)[\s\S]){0,100}?(?:writeFile|createWriteStream|save|upload|putObject|mv\s*\(|rename|storage)/gi,
     languages: ["javascript", "typescript"],
     fix: "Generate a random filename (UUID/nanoid) and validate the extension against an allowlist. Never use the original filename for storage.",
     fixCode:
