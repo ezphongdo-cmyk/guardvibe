@@ -18,7 +18,7 @@ interface Suppression {
 
 function parseSuppressionsFromCode(lines: string[]): Suppression[] {
   const suppressions: Suppression[] = [];
-  const pattern = /(?:\/\/|#|<!--)\s*guardvibe-ignore(?:-next-line)?\s*(VG\d+)?\s*(?:-->)?/i;
+  const pattern = /(?:\/\/|#|<!--)\s*guardvibe-ignore(?:-next-line)?\s*(VG\d+)?(?:\s.*)?(?:-->)?/i;
 
   for (let i = 0; i < lines.length; i++) {
     const match = pattern.exec(lines[i]);
@@ -26,11 +26,15 @@ function parseSuppressionsFromCode(lines: string[]): Suppression[] {
 
     const ruleId = match[1] || null;
     const isNextLine = lines[i].includes("guardvibe-ignore-next-line");
+    const isCommentOnlyLine = /^\s*(?:\/\/|#|<!--)/.test(lines[i]);
 
     if (isNextLine) {
-      suppressions.push({ line: i + 2, ruleId }); // next line (1-indexed)
+      suppressions.push({ line: i + 2, ruleId });
+    } else if (isCommentOnlyLine) {
+      suppressions.push({ line: i + 1, ruleId });
+      suppressions.push({ line: i + 2, ruleId });
     } else {
-      suppressions.push({ line: i + 1, ruleId }); // same line (1-indexed)
+      suppressions.push({ line: i + 1, ruleId });
     }
   }
 
