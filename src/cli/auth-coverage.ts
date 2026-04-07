@@ -8,6 +8,7 @@ import { resolve, dirname } from "path";
 import { parseArgs, validateFormat, getOutputPath } from "./args.js";
 import { analyzeAuthCoverage, formatAuthCoverage } from "../tools/auth-coverage.js";
 import type { FileEntry } from "../tools/auth-coverage.js";
+import { loadConfig } from "../utils/config.js";
 
 export async function runAuthCoverage(args: string[]): Promise<void> {
   const { flags, positional } = parseArgs(args);
@@ -46,7 +47,8 @@ export async function runAuthCoverage(args: string[]): Promise<void> {
   const layoutFiles = jsFiles.filter(f => /\/layout\.(ts|tsx|js|jsx)$/.test(f.path));
   const middlewareFile = jsFiles.find(f => /middleware\.(ts|js)$/.test(f.path));
 
-  const report = analyzeAuthCoverage(routeFiles, middlewareFile?.content ?? "", layoutFiles);
+  const config = loadConfig(targetPath);
+  const report = analyzeAuthCoverage(routeFiles, middlewareFile?.content ?? "", layoutFiles, config.authExceptions);
   const formatArg = format === "json" ? "json" as const : "markdown" as const;
   const result = formatAuthCoverage(report, formatArg);
 

@@ -179,7 +179,7 @@ export interface AuthCoverageReport {
 /**
  * Analyze auth coverage across all route files.
  */
-export function analyzeAuthCoverage(routeFiles: FileEntry[], middlewareContent: string, layoutFiles?: FileEntry[]): AuthCoverageReport {
+export function analyzeAuthCoverage(routeFiles: FileEntry[], middlewareContent: string, layoutFiles?: FileEntry[], authExceptions?: Array<{ path: string; reason: string }>): AuthCoverageReport {
   const routes = enumerateRoutes(routeFiles);
   const matchers = parseMiddlewareMatchers(middlewareContent);
   const hasMiddleware = middlewareContent.length > 0;
@@ -239,6 +239,22 @@ export function analyzeAuthCoverage(routeFiles: FileEntry[], middlewareContent: 
             break;
           }
         }
+      }
+    }
+  }
+
+  // Apply authExceptions from .guardviberc — mark excepted routes as protected
+  if (authExceptions && authExceptions.length > 0) {
+    for (const route of routes) {
+      if (route.hasAuthGuard || route.middlewareCovered) continue;
+      const isExcepted = authExceptions.some(exc => {
+        const excPath = exc.path.replace(/\[[\w]+\]/g, "[^/]+");
+        const regex = new RegExp("^" + excPath.replace(/\//g, "\\/") + "$");
+        return regex.test(route.urlPath) || route.urlPath === exc.path || route.urlPath.startsWith(exc.path + "/");
+      });
+      if (isExcepted) {
+        route.hasAuthGuard = true;
+        route.protectionSource = "auth-guard"; // treated as intentionally public
       }
     }
   }

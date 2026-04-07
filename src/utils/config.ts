@@ -31,6 +31,10 @@ export interface GuardVibeConfig {
    *  e.g. ["requireAdmin", "verifyUser", "ensureLoggedIn"]
    *  These are added ON TOP of the built-in pattern-agnostic detection. */
   authFunctions?: string[];
+  /** Routes that are intentionally public (no auth required).
+   *  e.g. [{"path": "/blog", "reason": "Public page"}]
+   *  These are excluded from auth-coverage unprotected count. */
+  authExceptions?: Array<{ path: string; reason: string }>;
 }
 
 const DEFAULT_CONFIG: GuardVibeConfig = {
@@ -106,6 +110,7 @@ export function loadConfig(dir?: string): GuardVibeConfig {
         requiredControls: Array.isArray(parsed.compliance.requiredControls) ? parsed.compliance.requiredControls : undefined,
       } : undefined,
       authFunctions: Array.isArray(parsed.authFunctions) ? parsed.authFunctions : undefined,
+      authExceptions: Array.isArray(parsed.authExceptions) ? parsed.authExceptions : undefined,
     };
   } catch {}
 

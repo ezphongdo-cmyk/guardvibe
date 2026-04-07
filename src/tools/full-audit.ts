@@ -17,6 +17,7 @@ import { auditConfig } from "./audit-config.js";
 import { analyzeCrossFileTaint } from "./cross-file-taint.js";
 import { analyzeAuthCoverage } from "./auth-coverage.js";
 import { getRules } from "../utils/rule-registry.js";
+import { loadConfig } from "../utils/config.js";
 
 // --- Types ---
 
@@ -277,7 +278,8 @@ export async function runFullAudit(
     const layoutFiles = jsFiles.filter(f => /\/layout\.(ts|tsx|js|jsx)$/.test(f.path));
     if (routeFiles.length > 0) {
       const middlewareFile = jsFiles.find(f => /middleware\.(ts|js)$/.test(f.path));
-      const report = analyzeAuthCoverage(routeFiles, middlewareFile?.content ?? "", layoutFiles);
+      const config = loadConfig(projectRoot);
+      const report = analyzeAuthCoverage(routeFiles, middlewareFile?.content ?? "", layoutFiles, config.authExceptions);
       const unprotected = report.unprotectedRoutes;
       sections.push({ name: "auth-coverage", status: "ok", findings: unprotected, critical: 0, high: unprotected > 0 ? unprotected : 0, medium: 0,
         details: `${report.protectedRoutes}/${report.totalRoutes} routes protected (${report.middlewareCoveragePercent}% middleware)` });
@@ -345,60 +347,60 @@ function buildInlineRemediationPlan(result: AuditResult): InlineRemediationStep[
       priority: 1,
       tool: "scan_secrets",
       actions: [
-        "Call scan_secrets with format: json to list all secrets with file locations",
-        "For EACH secret: move to environment variable, add file to .gitignore",
-        "Rotate any API keys/tokens that were committed — they are compromised",
-        "Call scan_secrets_history to check git history for previously committed secrets",
-        "Re-run scan_secrets to confirm 0 secrets remain",
+        "MCP: Call scan_secrets with format: json — OR CLI: run `npx guardvibe scan --format json` and look for SECRET: findings in the output",
+        "For EACH secret found: (a) if it's in a .env file, ensure .env* is in .gitignore, (b) if it's hardcoded in source code, move it to an environment variable, (c) NEVER dismiss secrets as 'already in .gitignore' — if GuardVibe found it, the FILE exists and contains real values",
+        "Rotate any API keys/tokens that were committed to git history — run `git log --all -p -S 'YOUR_KEY_PREFIX' -- '*.env*'` to check",
+        "MCP: Call scan_secrets_history — OR CLI: run `npx guardvibe scan --format json` to verify",
+        "Re-run the scan and confirm secret count dropped to 0. If it didn't, your fix didn't work — try again",
       ],
     },
     code: {
       priority: 2,
       tool: "scan_directory",
       actions: [
-        "Call scan_directory with format: json to get full finding list with fix suggestions",
-        "Fix ALL critical and high severity findings using fix_code for each file",
-        "Call verify_fix after each fix to confirm the vulnerability is resolved",
-        "Re-run scan_directory to confirm findings are resolved",
+        "MCP: Call scan_directory with format: json — OR CLI: run `npx guardvibe scan --format json` to get full finding list",
+        "Fix ALL critical and high severity findings. Read each flagged file, understand the vulnerability, apply the fix suggested in the finding",
+        "After fixing each file, re-scan it: MCP: Call scan_file — OR CLI: run `npx guardvibe check <file> --format json` to confirm the finding is gone",
+        "Re-run full scan to confirm total code findings dropped",
       ],
     },
     dependencies: {
       priority: 3,
       tool: "scan_dependencies",
       actions: [
-        "Call scan_dependencies with format: json to list vulnerable packages with CVE details",
-        "Run npm audit fix or npm update <package> for each vulnerable dependency",
-        "If a package is abandoned, find an alternative with check_package_health",
-        "Re-run scan_dependencies to confirm 0 CVEs remain",
+        "MCP: Call scan_dependencies with format: json — OR CLI: run `npx guardvibe scan --format json` and check dependency findings, also run `npm audit`",
+        "Run `npm audit fix` to auto-fix what's possible. If that doesn't work, run `npm update <package>` for each vulnerable package",
+        "If a package can't be updated (breaking changes), find an alternative or pin to a patched version",
+        "Re-run `npx guardvibe audit` and confirm dependency findings dropped to 0",
       ],
     },
     config: {
       priority: 4,
       tool: "audit_config",
       actions: [
-        "Call audit_config with format: json to list all config issues",
-        "Call explain_remediation for each finding to get specific fix guidance",
-        "Apply fixes to next.config, middleware, .env, vercel.json, etc.",
-        "Re-run audit_config to confirm config issues are resolved",
+        "MCP: Call audit_config with format: json — OR CLI: run `npx guardvibe audit --format json` and parse the config section details",
+        "Common config fixes: add missing security headers in next.config.ts (CSP, HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy), set poweredByHeader: false, configure CORS properly",
+        "MCP: Call explain_remediation for each rule ID — OR CLI: run `npx guardvibe explain <RULE_ID>` to get specific fix guidance",
+        "Re-run audit and confirm config findings dropped",
       ],
     },
     taint: {
       priority: 5,
       tool: "analyze_cross_file_dataflow",
       actions: [
-        "Call analyze_cross_file_dataflow to trace tainted data flows from source to sink",
-        "Add input validation (zod/joi) at each source, or output encoding at each sink",
-        "Re-run analyze_cross_file_dataflow to confirm tainted flows are resolved",
+        "MCP: Call analyze_cross_file_dataflow — OR CLI: run `npx guardvibe audit --format json` and parse the taint section. Look for user input (URL params, form data, req.body) flowing to dangerous sinks (SQL, HTML, file system)",
+        "Fix each tainted flow: add Zod/joi validation at the input source, use parameterized queries for SQL, use sanitizeUrl/DOMPurify for HTML output, validate file paths",
+        "Re-run audit and confirm taint findings dropped to 0",
       ],
     },
     "auth-coverage": {
       priority: 6,
       tool: "auth_coverage",
       actions: [
-        "Call auth_coverage with format: json to list all unprotected routes",
-        "Add auth guard (Clerk/NextAuth/Supabase) to each unprotected route",
-        "If a route is intentionally public, document it in .guardviberc authExceptions",
-        "Re-run auth_coverage to confirm all routes are protected or documented",
+        "MCP: Call auth_coverage with format: json — OR CLI: run `npx guardvibe auth-coverage --format json` to list all unprotected routes",
+        "For each unprotected route: (a) if it needs auth, add middleware or auth guard (Clerk/NextAuth/Supabase), (b) if it's intentionally public (homepage, blog, about, etc.), add it to .guardviberc file under authExceptions with a reason",
+        "Create or update .guardviberc in project root: {\"authExceptions\": [{\"path\": \"/blog\", \"reason\": \"Public page\"}]}",
+        "Re-run `npx guardvibe auth-coverage --format json` and confirm unprotected count matches your authExceptions count",
       ],
     },
   };

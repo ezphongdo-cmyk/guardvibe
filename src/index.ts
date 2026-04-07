@@ -1014,7 +1014,8 @@ server.tool(
       const layoutFiles = jsFiles.filter(f => /\/layout\.(ts|tsx|js|jsx)$/.test(f.path));
       const middlewareFile = jsFiles.find(f => /middleware\.(ts|js)$/.test(f.path));
 
-      const report = analyzeAuthCoverage(routeFiles, middlewareFile?.content ?? "", layoutFiles);
+      const cfg = loadConfig(path);
+      const report = analyzeAuthCoverage(routeFiles, middlewareFile?.content ?? "", layoutFiles, cfg.authExceptions);
       const output = formatAuthCoverage(report, format);
       return { content: [{ type: "text", text: output }] };
     }
