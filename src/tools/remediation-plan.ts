@@ -12,8 +12,7 @@
  * before moving to the next.
  */
 
-import { runFullAudit, type AuditResult, type AuditSection } from "./full-audit.js";
-import { resolve } from "node:path";
+import type { AuditResult, AuditSection } from "./full-audit.js";
 
 export interface RemediationStep {
   section: string;
