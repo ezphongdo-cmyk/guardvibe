@@ -228,8 +228,16 @@ export async function runFullAudit(
       const secretsJson = scanSecrets(projectRoot, true, "json");
       const parsed = safeJsonParse(secretsJson);
       if (parsed) {
-        const counts = parseSectionCounts(parsed);
-        const secretFindings: SectionFinding[] = (parsed.findings ?? []).map((f: Record<string, unknown>) => ({
+        // Filter out gitignored secrets — they're local dev files, not a security risk
+        const rawFindings = parsed.findings ?? [];
+        const actionableFindings = rawFindings.filter((f: Record<string, unknown>) => f.gitStatus !== "ignored");
+        const ignoredCount = rawFindings.length - actionableFindings.length;
+
+        const actionableCritical = actionableFindings.filter((f: Record<string, unknown>) => f.severity === "critical").length;
+        const actionableHigh = actionableFindings.filter((f: Record<string, unknown>) => f.severity === "high").length;
+        const actionableMedium = actionableFindings.length - actionableCritical - actionableHigh;
+
+        const secretFindings: SectionFinding[] = actionableFindings.map((f: Record<string, unknown>) => ({
           ruleId: `SECRET:${(f.provider ?? "unknown") as string}`,
           severity: (f.severity ?? "high") as string,
           file: (f.file ?? "") as string,
@@ -238,8 +246,17 @@ export async function runFullAudit(
           description: (f.match ?? f.description ?? "") as string,
           fix: "Move this secret to an environment variable and ensure the file is in .gitignore",
         }));
-        sections.push({ name: "secrets", status: "ok", ...counts, details: counts.findings === 0 ? "No secrets found" : `${counts.findings} secret(s) detected`, sectionFindings: secretFindings });
-        for (const f of parsed.findings ?? []) {
+
+        const detailText = actionableFindings.length === 0
+          ? (ignoredCount > 0 ? `${ignoredCount} secret(s) in .gitignore (safe)` : "No secrets found")
+          : `${actionableFindings.length} secret(s) detected${ignoredCount > 0 ? ` (${ignoredCount} in .gitignore excluded)` : ""}`;
+
+        sections.push({
+          name: "secrets", status: "ok",
+          findings: actionableFindings.length, critical: actionableCritical, high: actionableHigh, medium: actionableMedium,
+          details: detailText, sectionFindings: secretFindings,
+        });
+        for (const f of actionableFindings) {
           allFindings.push({ ruleId: `SECRET:${f.provider ?? "unknown"}`, severity: f.severity, file: f.file ?? "", line: f.line ?? 0 });
         }
       }
@@ -442,60 +459,54 @@ function buildInlineRemediationPlan(result: AuditResult): InlineRemediationStep[
       priority: 1,
       tool: "scan_secrets",
       actions: [
-        "MCP: Call scan_secrets with format: json — OR CLI: run `npx guardvibe scan --format json` and look for SECRET: findings in the output",
-        "For EACH secret found: (a) if it's in a .env file, ensure .env* is in .gitignore, (b) if it's hardcoded in source code, move it to an environment variable, (c) NEVER dismiss secrets as 'already in .gitignore' — if GuardVibe found it, the FILE exists and contains real values",
-        "Rotate any API keys/tokens that were committed to git history — run `git log --all -p -S 'YOUR_KEY_PREFIX' -- '*.env*'` to check",
-        "MCP: Call scan_secrets_history — OR CLI: run `npx guardvibe scan --format json` to verify",
-        "Re-run the scan and confirm secret count dropped to 0. If it didn't, your fix didn't work — try again",
+        "Look at sectionFindings above — each has file, line, description",
+        "For each: move hardcoded secret to .env, add file to .gitignore",
+        "Verify: run `npx guardvibe audit --format json 2>&1 | head -1` — secrets count must be 0",
       ],
     },
     code: {
       priority: 2,
       tool: "scan_directory",
       actions: [
-        "MCP: Call scan_directory with format: json — OR CLI: run `npx guardvibe scan --format json` to get full finding list",
-        "Fix ALL critical and high severity findings. Read each flagged file, understand the vulnerability, apply the fix suggested in the finding",
-        "After fixing each file, re-scan it: MCP: Call scan_file — OR CLI: run `npx guardvibe check <file> --format json` to confirm the finding is gone",
-        "Re-run full scan to confirm total code findings dropped",
+        "Look at sectionFindings above — each has ruleId, file, line, fix",
+        "Read each file, apply the fix. Run `npx guardvibe explain <RULE_ID>` if unclear",
+        "Verify each file: `npx guardvibe check <file> --format json` — must show 0 findings",
       ],
     },
     dependencies: {
       priority: 3,
       tool: "scan_dependencies",
       actions: [
-        "MCP: Call scan_dependencies with format: json — OR CLI: run `npx guardvibe scan --format json` and check dependency findings, also run `npm audit`",
-        "Run `npm audit fix` to auto-fix what's possible. If that doesn't work, run `npm update <package>` for each vulnerable package",
-        "If a package can't be updated (breaking changes), find an alternative or pin to a patched version",
-        "Re-run `npx guardvibe audit` and confirm dependency findings dropped to 0",
+        "Look at sectionFindings above — each has package name and CVE",
+        "Run `npm update <package>` for each. If already latest, check for alternative package",
+        "Verify: re-run audit — dependencies count must drop",
       ],
     },
     config: {
       priority: 4,
       tool: "audit_config",
       actions: [
-        "MCP: Call audit_config with format: json — OR CLI: run `npx guardvibe audit --format json` and parse the config section details",
-        "Common config fixes: add missing security headers in next.config.ts (CSP, HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy), set poweredByHeader: false, configure CORS properly",
-        "MCP: Call explain_remediation for each rule ID — OR CLI: run `npx guardvibe explain <RULE_ID>` to get specific fix guidance",
-        "Re-run audit and confirm config findings dropped",
+        "Look at sectionFindings above — each has ruleId, file, title, fix",
+        "Run `npx guardvibe explain <RULE_ID>` for each finding to get exact fix code",
+        "Apply fixes to the listed files. Verify: re-run audit — config count must drop",
       ],
     },
     taint: {
       priority: 5,
       tool: "analyze_cross_file_dataflow",
       actions: [
-        "MCP: Call analyze_cross_file_dataflow — OR CLI: run `npx guardvibe audit --format json` and parse the taint section. Look for user input (URL params, form data, req.body) flowing to dangerous sinks (SQL, HTML, file system)",
-        "Fix each tainted flow: add Zod/joi validation at the input source, use parameterized queries for SQL, use sanitizeUrl/DOMPurify for HTML output, validate file paths",
-        "Re-run audit and confirm taint findings dropped to 0",
+        "Look at sectionFindings above — each shows source file:line → sink file:line",
+        "Add input validation (Zod) at source, or sanitization at sink",
+        "Verify: re-run audit — taint count must be 0",
       ],
     },
     "auth-coverage": {
       priority: 6,
       tool: "auth_coverage",
       actions: [
-        "MCP: Call auth_coverage with format: json — OR CLI: run `npx guardvibe auth-coverage --format json` to list all unprotected routes",
-        "For each unprotected route: (a) if it needs auth, add middleware or auth guard (Clerk/NextAuth/Supabase), (b) if it's intentionally public (homepage, blog, about, etc.), add it to .guardviberc file under authExceptions with a reason",
-        "Create or update .guardviberc in project root: {\"authExceptions\": [{\"path\": \"/blog\", \"reason\": \"Public page\"}]}",
-        "Re-run `npx guardvibe auth-coverage --format json` and confirm unprotected count matches your authExceptions count",
+        "Look at sectionFindings above — each shows unprotected route path and file",
+        "Add auth guard, or add to .guardviberc authExceptions: {\"path\": \"/route\", \"reason\": \"Public\"}",
+        "Verify: `npx guardvibe auth-coverage --format json` — unprotected must be 0",
       ],
     },
   };
@@ -536,14 +547,11 @@ export function formatAuditResult(result: AuditResult, format: "markdown" | "jso
         ...result,
         remediationPlan: {
           totalSectionsWithFindings: plan.length,
-          warning: `MANDATORY: You must fix ALL ${plan.length} sections below. Do NOT fix only the code section and skip the rest. Work through each section in priority order. After completing ALL sections, call verify_remediation to confirm.`,
+          warning: `FIX ALL ${plan.length} SECTIONS. Each section has sectionFindings with exact file, line, and fix. Process every finding. After ALL sections: re-run audit to verify.`,
           rules: [
-            "Do NOT dismiss findings as 'false positive' without running the section-specific tool first and verifying the finding is genuinely wrong.",
-            "Do NOT say 'npm audit is clean' to skip dependencies — GuardVibe uses the OSV database which may detect CVEs that npm audit misses.",
-            "Do NOT say 'already in .gitignore' to skip secrets — if GuardVibe detects secrets, they exist in the scanned files and must be removed or moved to env vars.",
-            "Do NOT skip auth-coverage by saying routes are 'intentionally public' — either add auth guards or add them to .guardviberc authExceptions so the scanner recognizes them.",
-            "After fixing each section, re-run the section-specific tool to confirm the finding count dropped. If it didn't drop, your fix didn't work.",
-            "Only call verify_remediation AFTER you have worked through ALL sections and confirmed each one improved.",
+            "NEVER use 'npx guardvibe diff' — use 'npx guardvibe audit --format json 2>&1 | head -1'",
+            "Fix EVERY finding in sectionFindings — not just one section",
+            "After fixing, re-run audit and verify finding count dropped",
           ],
           steps: plan,
         },
@@ -627,14 +635,7 @@ export function formatAuditResult(result: AuditResult, format: "markdown" | "jso
       lines.push(``);
       lines.push(`## Mandatory Remediation Plan`);
       lines.push(``);
-      lines.push(`> **IMPORTANT: You MUST fix ALL ${plan.length} sections below. Do NOT fix only the code section and skip the rest. Work through each section in priority order. After completing ALL sections, call \`verify_remediation\` to confirm.**`);
-      lines.push(``);
-      lines.push(`**Rules:**`);
-      lines.push(`- Do NOT dismiss findings as "false positive" without running the section-specific tool first`);
-      lines.push(`- Do NOT say "npm audit is clean" to skip dependencies — GuardVibe uses OSV which may detect CVEs npm misses`);
-      lines.push(`- Do NOT say "already in .gitignore" to skip secrets — if detected, they exist in scanned files`);
-      lines.push(`- After fixing each section, re-run the section tool to confirm finding count dropped`);
-      lines.push(`- Only call verify_remediation AFTER all sections show improvement`);
+      lines.push(`> **FIX ALL ${plan.length} SECTIONS. Each section's sectionFindings has exact file, line, and fix. Process every finding. Re-run audit after ALL sections to verify.**`);
       lines.push(``);
 
       for (const step of plan) {
