@@ -175,11 +175,20 @@ function runChecks(files: ProjectFiles, root: string): ConfigIssue[] {
           .map(r => r.path.replace(resolve(root), "").replace(/\\/g, "/"))
           .filter(p => p.includes("/api/"));
 
+        // Check which routes are NOT covered by middleware matcher
+        // But exclude routes that have in-handler auth (requireAdmin, requireAuth, etc.)
+        const authGuardPattern = /requireAdmin|requireAuth|checkAuth|withAuth|getServerSession|auth\(\)|clerkClient|currentUser/;
         const unprotectedApiRoutes = apiRoutes.filter(route => {
-          return !matcherPaths.some(pattern => {
+          // Check if middleware matcher covers this route
+          const coveredByMatcher = matcherPaths.some(pattern => {
             const normalized = pattern.replace(/:path\*/, "").replace(/\(.*?\)/, "");
             return route.startsWith(normalized) || route.includes(normalized);
           });
+          if (coveredByMatcher) return false;
+          // Check if the route handler has in-handler auth guard
+          const handler = files.routeHandlers.find(r => r.path.replace(resolve(root), "").replace(/\\/g, "/") === route);
+          if (handler && authGuardPattern.test(handler.content)) return false;
+          return true;
         });
 
         if (unprotectedApiRoutes.length > 0) {
@@ -219,11 +228,23 @@ function runChecks(files: ProjectFiles, root: string): ConfigIssue[] {
   }
 
   // Check for secrets in .env files that are also in NEXT_PUBLIC_
+  // Known safe public keys that are DESIGNED to be in client bundles
+  const knownPublicKeys = new Set([
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
+    "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY",
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+    "NEXT_PUBLIC_RECAPTCHA_SITE_KEY",
+    "NEXT_PUBLIC_GA_MEASUREMENT_ID",
+    "NEXT_PUBLIC_SITE_URL",
+    "NEXT_PUBLIC_APP_URL",
+  ]);
   for (const envFile of files.envFiles) {
     const lines = envFile.content.split("\n");
     for (const line of lines) {
       const match = /^(NEXT_PUBLIC_\w*(?:SECRET|KEY|PASSWORD|TOKEN|PRIVATE|CREDENTIAL)\w*)\s*=/.exec(line);
-      if (match && !/PUBLISHABLE/i.test(match[1])) {
+      if (match && !/PUBLISHABLE/i.test(match[1]) && !knownPublicKeys.has(match[1])) {
         issues.push({
           id: "AC021", severity: "critical", category: "secrets",
           title: `NEXT_PUBLIC_ exposes secret: ${match[1]}`,

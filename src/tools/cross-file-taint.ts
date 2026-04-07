@@ -365,6 +365,19 @@ const SINK_PATTERNS = [
   { pattern: /readFileSync?\s*\(/g, type: "path-traversal" },
 ];
 
+// Patterns that break the taint chain (validation/sanitization)
+const SANITIZER_PATTERNS = [
+  /validate\w*\s*\(/i,
+  /sanitize\w*\s*\(/i,
+  /safeParse\s*\(/i,
+  /parseBody\s*\(/i,
+  /DOMPurify/i,
+  /encodeURIComponent\s*\(/i,
+  /\.hostname\s*!==?\s*/i,
+  /\.origin\s*!==?\s*/i,
+  /allowlist|whitelist|allowedHosts/i,
+];
+
 function checkParamFlowsToSink(paramName: string, body: string, startLine: number): { sinkType: string; sinkLine: number; sinkCode: string } | null {
   const lines = body.split("\n");
   const taintedNames = new Set([paramName]);
@@ -375,9 +388,18 @@ function checkParamFlowsToSink(paramName: string, body: string, startLine: numbe
     if (m) {
       for (const t of taintedNames) {
         if (m[2].includes(t)) {
-          taintedNames.add(m[1]);
+          const isSanitized = SANITIZER_PATTERNS.some(p => p.test(m[2]));
+          if (!isSanitized) {
+            taintedNames.add(m[1]);
+          }
           break;
         }
+      }
+    }
+    // Break taint if value passes through validation
+    for (const t of taintedNames) {
+      if (line.includes(t) && SANITIZER_PATTERNS.some(p => p.test(line))) {
+        taintedNames.delete(t);
       }
     }
   }
