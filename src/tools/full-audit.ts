@@ -39,6 +39,16 @@ export interface FindingRef {
   [key: string]: unknown;
 }
 
+export interface SectionFinding {
+  ruleId: string;
+  severity: string;
+  file: string;
+  line: number;
+  name?: string;
+  description?: string;
+  fix?: string;
+}
+
 export interface AuditSection {
   name: string;
   status: "ok" | "error" | "skipped";
@@ -47,6 +57,8 @@ export interface AuditSection {
   high: number;
   medium: number;
   details: string;
+  /** Individual findings for this section — enables AI to see exactly what to fix */
+  sectionFindings?: SectionFinding[];
 }
 
 export interface AuditResult {
@@ -190,7 +202,15 @@ export async function runFullAudit(
       score = parsed.summary?.score ?? 100;
       const codeGrade = parsed.summary?.grade ?? "A";
       const codeScore = parsed.summary?.score ?? 100;
-      sections.push({ name: "code", status: "ok", ...counts, details: `Code ${codeGrade} (${codeScore}/100)` });
+      const codeSectionFindings: SectionFinding[] = (parsed.findings ?? []).map((f: Record<string, unknown>) => ({
+        ruleId: (f.id ?? "unknown") as string,
+        severity: f.severity as string,
+        file: (f.file ?? "") as string,
+        line: (f.line ?? 0) as number,
+        name: f.name as string | undefined,
+        fix: f.fix as string | undefined,
+      }));
+      sections.push({ name: "code", status: "ok", ...counts, details: `Code ${codeGrade} (${codeScore}/100)`, sectionFindings: codeSectionFindings });
       for (const f of parsed.findings ?? []) {
         allFindings.push({ ruleId: f.id ?? "unknown", severity: f.severity, file: f.file ?? "", line: f.line ?? 0 });
       }
@@ -209,7 +229,16 @@ export async function runFullAudit(
       const parsed = safeJsonParse(secretsJson);
       if (parsed) {
         const counts = parseSectionCounts(parsed);
-        sections.push({ name: "secrets", status: "ok", ...counts, details: counts.findings === 0 ? "No secrets found" : `${counts.findings} secret(s) detected` });
+        const secretFindings: SectionFinding[] = (parsed.findings ?? []).map((f: Record<string, unknown>) => ({
+          ruleId: `SECRET:${(f.provider ?? "unknown") as string}`,
+          severity: (f.severity ?? "high") as string,
+          file: (f.file ?? "") as string,
+          line: (f.line ?? 0) as number,
+          name: `Secret detected: ${(f.provider ?? "unknown") as string}`,
+          description: (f.match ?? f.description ?? "") as string,
+          fix: "Move this secret to an environment variable and ensure the file is in .gitignore",
+        }));
+        sections.push({ name: "secrets", status: "ok", ...counts, details: counts.findings === 0 ? "No secrets found" : `${counts.findings} secret(s) detected`, sectionFindings: secretFindings });
         for (const f of parsed.findings ?? []) {
           allFindings.push({ ruleId: `SECRET:${f.provider ?? "unknown"}`, severity: f.severity, file: f.file ?? "", line: f.line ?? 0 });
         }
@@ -227,12 +256,23 @@ export async function runFullAudit(
         if (parsed) {
           const vuln = parsed.summary?.vulnerable ?? 0;
           const counts = { findings: vuln, critical: parsed.summary?.critical ?? 0, high: parsed.summary?.high ?? 0, medium: parsed.summary?.medium ?? 0 };
-          sections.push({ name: "dependencies", status: "ok", ...counts, details: vuln === 0 ? "No known CVEs" : `${vuln} vulnerable package(s)` });
+          const depFindings: SectionFinding[] = [];
           for (const pkg of parsed.packages ?? []) {
-            for (const v of pkg.vulnerabilities ?? []) {
-              allFindings.push({ ruleId: `DEP:${v.id ?? "CVE"}`, severity: v.severity, file: "package.json", line: 0 });
+            for (const v of (pkg as Record<string, unknown[]>).vulnerabilities ?? []) {
+              const vuln2 = v as Record<string, unknown>;
+              depFindings.push({
+                ruleId: `DEP:${(vuln2.id ?? "CVE") as string}`,
+                severity: (vuln2.severity ?? "high") as string,
+                file: "package.json",
+                line: 0,
+                name: `${(pkg as Record<string, unknown>).name ?? "unknown"}: ${(vuln2.id ?? "CVE") as string}`,
+                description: (vuln2.summary ?? vuln2.details ?? "") as string,
+                fix: `Run: npm update ${(pkg as Record<string, unknown>).name ?? ""}`,
+              });
+              allFindings.push({ ruleId: `DEP:${vuln2.id ?? "CVE"}` as string, severity: vuln2.severity as string, file: "package.json", line: 0 });
             }
           }
+          sections.push({ name: "dependencies", status: "ok", ...counts, details: vuln === 0 ? "No known CVEs" : `${vuln} vulnerable package(s)`, sectionFindings: depFindings });
         }
       } catch { sections.push({ name: "dependencies", status: "error", findings: 0, critical: 0, high: 0, medium: 0, details: "Scan error" }); }
     } else {
@@ -246,7 +286,16 @@ export async function runFullAudit(
     const parsed = safeJsonParse(configJson);
     if (parsed) {
       const counts = parseSectionCounts(parsed);
-      sections.push({ name: "config", status: "ok", ...counts, details: counts.findings === 0 ? "Config secure" : `${counts.findings} config issue(s)` });
+      const configFindings: SectionFinding[] = (parsed.findings ?? []).map((f: Record<string, unknown>) => ({
+        ruleId: ((f.id ?? f.ruleId ?? "CONFIG") as string),
+        severity: ((f.severity ?? "medium") as string),
+        file: ((f.file ?? "") as string),
+        line: ((f.line ?? 0) as number),
+        name: (f.name ?? f.description ?? "") as string,
+        description: (f.description ?? f.details ?? "") as string,
+        fix: (f.fix ?? f.remediation ?? "") as string,
+      }));
+      sections.push({ name: "config", status: "ok", ...counts, details: counts.findings === 0 ? "Config secure" : `${counts.findings} config issue(s)`, sectionFindings: configFindings });
       for (const f of parsed.findings ?? []) {
         allFindings.push({ ruleId: f.id ?? f.ruleId ?? "CONFIG", severity: f.severity ?? "medium", file: f.file ?? "", line: f.line ?? 0 });
       }
@@ -264,8 +313,31 @@ export async function runFullAudit(
       const taintCritical = crossFileFindings.filter(f => f.severity === "critical").length;
       const taintHigh = crossFileFindings.filter(f => f.severity === "high").length;
       const taintMedium = taintTotal - taintCritical - taintHigh;
+      const taintSectionFindings: SectionFinding[] = crossFileFindings.map(f => ({
+        ruleId: `TAINT:${f.sink.type}`,
+        severity: f.severity,
+        file: f.source.file,
+        line: f.source.line,
+        name: `Tainted flow: ${f.source.type} → ${f.sink.type}`,
+        description: `User input from ${f.source.file}:${f.source.line} flows to ${f.sink.type} in ${f.sink.file}:${f.sink.line}`,
+        fix: `Add input validation at ${f.source.file}:${f.source.line} or output encoding at ${f.sink.file}:${f.sink.line}`,
+      }));
+      // Add per-file findings
+      for (const [file, findings] of perFileFindings) {
+        for (const pf of findings) {
+          taintSectionFindings.push({
+            ruleId: `TAINT:${pf.sink.type}`,
+            severity: "medium",
+            file,
+            line: pf.source.line,
+            name: `Tainted flow: ${pf.source.type} → ${pf.sink.type}`,
+            description: `${pf.source.type} (${pf.source.variable}) at line ${pf.source.line} flows to ${pf.sink.type} at line ${pf.sink.line}`,
+            fix: `Add validation/sanitization at line ${pf.source.line} before ${pf.sink.type} usage at line ${pf.sink.line}`,
+          });
+        }
+      }
       sections.push({ name: "taint", status: "ok", findings: taintTotal, critical: taintCritical, high: taintHigh, medium: taintMedium,
-        details: taintTotal === 0 ? "No tainted data flows" : `${taintTotal} tainted flow(s)` });
+        details: taintTotal === 0 ? "No tainted data flows" : `${taintTotal} tainted flow(s)`, sectionFindings: taintSectionFindings });
       for (const f of crossFileFindings) {
         allFindings.push({ ruleId: `TAINT:${f.sink.type}`, severity: f.severity, file: f.source.file, line: f.source.line });
       }
@@ -282,8 +354,17 @@ export async function runFullAudit(
       const config = loadConfig(projectRoot);
       const report = analyzeAuthCoverage(routeFiles, middlewareFile?.content ?? "", layoutFiles, config.authExceptions);
       const unprotected = report.unprotectedRoutes;
+      const authFindings: SectionFinding[] = report.unprotectedList.map(r => ({
+        ruleId: "AUTH:UNPROTECTED",
+        severity: "high",
+        file: r.filePath,
+        line: 0,
+        name: `Unprotected route: ${r.urlPath} (${r.method})`,
+        description: `Route ${r.urlPath} has no auth guard, middleware protection, or layout-level auth`,
+        fix: `Add auth guard to ${r.filePath}, or add {"path": "${r.urlPath}", "reason": "Public page"} to .guardviberc authExceptions`,
+      }));
       sections.push({ name: "auth-coverage", status: "ok", findings: unprotected, critical: 0, high: unprotected > 0 ? unprotected : 0, medium: 0,
-        details: `${report.protectedRoutes}/${report.totalRoutes} routes protected (${report.middlewareCoveragePercent}% middleware)` });
+        details: `${report.protectedRoutes}/${report.totalRoutes} routes protected (${report.middlewareCoveragePercent}% middleware)`, sectionFindings: authFindings });
     }
   } catch { /* auth coverage is optional */ }
 
