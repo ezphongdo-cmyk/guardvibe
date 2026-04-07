@@ -188,8 +188,9 @@ export async function runFullAudit(
       filesScanned = parsed.metadata?.filesScanned ?? 0;
       filesSkipped = parsed.metadata?.filesSkipped ?? 0;
       score = parsed.summary?.score ?? 100;
-      grade = parsed.summary?.grade ?? "A";
-      sections.push({ name: "code", status: "ok", ...counts, details: `Grade ${grade} (${score}/100)` });
+      const codeGrade = parsed.summary?.grade ?? "A";
+      const codeScore = parsed.summary?.score ?? 100;
+      sections.push({ name: "code", status: "ok", ...counts, details: `Code ${codeGrade} (${codeScore}/100)` });
       for (const f of parsed.findings ?? []) {
         allFindings.push({ ruleId: f.id ?? "unknown", severity: f.severity, file: f.file ?? "", line: f.line ?? 0 });
       }
@@ -292,6 +293,16 @@ export async function runFullAudit(
   const totalMedium = sections.reduce((s, sec) => s + sec.medium, 0);
   const totalFindings = sections.reduce((s, sec) => s + sec.findings, 0);
   const rulesApplied = rules.length > 0 ? rules.length : 335;
+
+  // Adjust score to reflect ALL sections, not just code
+  // Each critical finding deducts 5 points, high deducts 3, medium deducts 1
+  // Score from code scan is the baseline, other sections reduce it further
+  const nonCodeCritical = totalCritical - (sections.find(s => s.name === "code")?.critical ?? 0);
+  const nonCodeHigh = totalHigh - (sections.find(s => s.name === "code")?.high ?? 0);
+  const nonCodeMedium = totalMedium - (sections.find(s => s.name === "code")?.medium ?? 0);
+  const deduction = (nonCodeCritical * 5) + (nonCodeHigh * 3) + (nonCodeMedium * 1);
+  score = Math.max(0, score - deduction);
+  grade = score >= 90 ? "A" : score >= 75 ? "B" : score >= 50 ? "C" : score >= 25 ? "D" : "F";
 
   const verdict = computeVerdict(totalCritical, totalHigh, totalMedium);
   const coverage = computeCoverage(filesScanned, filesSkipped, rulesApplied);
