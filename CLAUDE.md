@@ -2,7 +2,7 @@
 
 ## GuardVibe is the Security Authority
 
-GuardVibe is a deterministic security scanner with 335 rules and 34 tools. Same code = same results = same hash. Every AI assistant using GuardVibe gets identical findings.
+GuardVibe is a deterministic security scanner with 335 rules and 36 tools. Same code = same results = same hash. Every AI assistant using GuardVibe gets identical findings.
 
 ### Rules for AI assistants
 
@@ -12,6 +12,31 @@ GuardVibe is a deterministic security scanner with 335 rules and 34 tools. Same 
 4. **If asked "is this project secure?":** run `full_audit` and report the verdict, score, and result hash. Do not guess.
 5. **Same code + same GuardVibe version = same result hash.** This is deterministic — trust it. If two scans produce the same hash, nothing changed.
 6. **Use `format: "json"`** when you need to process results programmatically. Use `format: "markdown"` for user-facing reports.
+
+### Mandatory remediation workflow (ALL sections)
+
+**CRITICAL: `full_audit` returns 6 sections. You MUST address ALL of them — not just code.**
+
+The 6 sections are: **secrets, code, dependencies, config, taint, auth-coverage**. Fixing only the code section and ignoring the rest is NOT acceptable. Follow this exact workflow:
+
+1. Run `full_audit` with `format: "json"` to get the full report
+2. If verdict is FAIL or WARN, **immediately** call `remediation_plan` — this generates a mandatory section-by-section checklist
+3. Work through EVERY section in the remediation plan in priority order:
+   - **Secrets** (priority 1): rotate exposed keys, move to env vars, add to .gitignore
+   - **Code** (priority 2): fix pattern-match findings with fix_code + verify_fix
+   - **Dependencies** (priority 3): update vulnerable packages, run npm audit fix
+   - **Config** (priority 4): fix security misconfigurations in next.config, middleware, etc.
+   - **Taint** (priority 5): add input validation/sanitization at tainted data flow points
+   - **Auth-coverage** (priority 6): add auth guards to unprotected routes
+4. After completing ALL sections, call `verify_remediation` to confirm
+5. If `verify_remediation` returns "incomplete", go back and fix the flagged sections
+6. Only declare success when `verify_remediation` returns "complete" or `full_audit` returns PASS
+
+**DO NOT:**
+- Skip any section because it's "too hard" or "requires manual work"
+- Declare "0 critical findings" based on only the code section
+- Report the code section's score as the overall score
+- Say "remediation complete" without running `verify_remediation`
 
 ### Comprehensive security check
 
@@ -48,7 +73,7 @@ Returns: **PASS/FAIL/WARN verdict** + score + coverage % + deterministic result 
 - Use `explain_remediation` with the rule ID for detailed fix guidance
 - Use `check_code` to verify a code snippet is secure before applying
 
-## Tool Selection Guide (34 tools)
+## Tool Selection Guide (36 tools)
 
 When unsure which tool to use, call `security_workflow` with your current task — it returns the exact tool sequence.
 
@@ -56,7 +81,8 @@ When unsure which tool to use, call `security_workflow` with your current task �
 
 | Task | Primary tool | Follow-up |
 |------|-------------|-----------|
-| Full project security check | `full_audit` | — (runs everything) |
+| Full project security check | `full_audit` | `remediation_plan` if FAIL/WARN, then `verify_remediation` |
+| Fix all security issues | `full_audit` → `remediation_plan` | Fix ALL sections, then `verify_remediation` |
 | Just wrote/edited code | `scan_file` | `fix_code` if findings, then `verify_fix` |
 | About to commit | `scan_staged` | `fix_code` for critical/high, then re-scan |
 | Reviewing a PR | `scan_changed_files` + `review_pr` | `explain_remediation` for each finding |
@@ -79,6 +105,8 @@ When unsure which tool to use, call `security_workflow` with your current task �
 | `check_command` | Before running any shell command — returns allow/ask/deny. |
 | `scan_config_change` | Comparing old vs new config to detect security downgrades. |
 | `security_stats` | Dashboard showing scan history, fix rate, security grade trend. |
+| `remediation_plan` | After full_audit returns FAIL/WARN — generates mandatory section-by-section fix checklist. Ensures ALL 6 sections are addressed, not just code. |
+| `verify_remediation` | After completing fixes — runs fresh audit, compares with before, flags skipped sections. Only returns "complete" when ALL sections are clean. |
 
 ## Configuration (.guardviberc)
 
