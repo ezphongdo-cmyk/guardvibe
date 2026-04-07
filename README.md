@@ -6,7 +6,7 @@
 [![npm provenance](https://img.shields.io/badge/provenance-verified-brightgreen)](https://www.npmjs.com/package/guardvibe)
 [![codecov](https://codecov.io/gh/goklab/guardvibe/graph/badge.svg)](https://codecov.io/gh/goklab/guardvibe)
 
-**The security MCP built for vibe coding.** 335 security rules, 34 tools covering the entire AI-generated code journey — from first line to production deployment.
+**The security MCP built for vibe coding.** 335 security rules, 36 tools covering the entire AI-generated code journey — from first line to production deployment.
 
 Works with **Claude Code, Cursor, Gemini CLI, Codex, VS Code (Copilot), Windsurf**, and any MCP-compatible coding agent.
 
@@ -14,7 +14,7 @@ Works with **Claude Code, Cursor, Gemini CLI, Codex, VS Code (Copilot), Windsurf
 
 Most security tools are built for enterprise security teams. GuardVibe is built for **you** — the developer using AI to build and ship web apps fast.
 
-- **335 security rules, 34 tools** purpose-built for the stacks AI agents generate
+- **335 security rules, 36 tools** purpose-built for the stacks AI agents generate
 - **Zero setup friction** — `npx guardvibe` and you're scanning
 - **No account required** — runs 100% locally, no API keys, no cloud
 - **Understands your stack** — not generic SAST, but rules that know Next.js, Supabase, Stripe, Clerk, and the tools you actually use
@@ -25,6 +25,15 @@ Most security tools are built for enterprise security teams. GuardVibe is built 
 - **CI/CD ready** — GitHub Actions workflow with SARIF upload to Security tab
 - **Agent-friendly output** — JSON format for AI agents, Markdown for humans, SARIF for CI/CD
 - **Plugin system** — extend with community or premium rule packs
+
+## New in v3
+
+- **Inline suppress** — `// guardvibe-ignore VG001` silences individual findings per-line
+- **CLI-first approach** — `npx guardvibe audit`, `npx guardvibe scan`, `npx guardvibe doctor` all work standalone without MCP
+- **Embedded remediation plan** — `remediation_plan` generates a section-by-section fix checklist after every audit
+- **Score reflects all sections** — security score now factors code, dependencies, config, secrets, auth coverage, and taint analysis
+- **Gitignored secrets excluded** — files matched by `.gitignore` are automatically skipped during secret scanning
+- **Taint sanitizer recognition** — dataflow analysis recognizes common sanitizers (DOMPurify, escape functions, parameterized queries) and stops propagation
 
 ## How GuardVibe Compares
 
@@ -183,7 +192,7 @@ Maps security findings to SOC2, PCI-DSS, HIPAA, GDPR, ISO27001, and EU AI Act (E
 ### Supply Chain
 Malicious postinstall scripts, unpinned GitHub Actions, typosquat detection
 
-## Tools (33 MCP tools)
+## Tools (36 MCP tools)
 
 | Tool | What it does |
 |------|-------------|
@@ -221,6 +230,8 @@ Malicious postinstall scripts, unpinned GitHub Actions, typosquat detection
 | `auth_coverage` | **Auth coverage map** — enumerate routes, parse middleware matchers, detect auth guards, report coverage % |
 | `deep_scan` | **LLM-powered deep analysis** — IDOR, business logic, race conditions, privilege escalation (requires API key) |
 | `full_audit` | **Single source of truth** — runs ALL checks in one call, returns PASS/FAIL/WARN verdict + score + coverage % + deterministic result hash |
+| `remediation_plan` | **Remediation plan** — generates section-by-section fix checklist after audit |
+| `verify_remediation` | **Remediation verification** — compares before/after audit, flags skipped sections |
 
 All scanning tools support `format: "json"` for machine-readable output.
 

@@ -394,7 +394,7 @@ export const advancedSecurityRules: SecurityRule[] = [
     owasp: "A04:2025 Insecure Design",
     description:
       "Regular expression contains nested quantifiers ((a+)+), overlapping alternation with quantifiers (([a-z]+)*), or other patterns that cause catastrophic backtracking. Attackers can send crafted input to freeze the event loop.",
-    pattern: /\/(?:[^/\\]|\\.)*(?:\([^)]*[+*][^)]*\)[+*]|\(\?:[^)]*[+*][^)]*\)[+*]|\[[^\]]*\][+*][^/]*[+*])(?:[^/\\]|\\.)*\//g,
+    pattern: /\/(?:[^/\\]|\\.)*(?:\([^)]*[+*][^)]*\)\s*[+*]|\(\?:[^)]*[+*][^)]*\)\s*[+*])(?:[^/\\]|\\.)*\//g,
     languages: ["javascript", "typescript"],
     fix: "Rewrite the regex to avoid nested quantifiers. Use atomic groups or possessive quantifiers if available, or use the 'safe-regex' library to validate patterns.",
     fixCode:
@@ -426,7 +426,7 @@ export const advancedSecurityRules: SecurityRule[] = [
     owasp: "A01:2025 Broken Access Control",
     description:
       "POST/PUT/PATCH/DELETE route handler performs database mutations without CSRF token verification. Cross-site requests from malicious pages can trick authenticated users into performing unwanted actions.",
-    pattern: /export\s+(?:async\s+)?function\s+(?:POST|PUT|PATCH|DELETE)\s*\([^)]*\)\s*\{(?:(?!csrf|csrfToken|CSRF|x-csrf|verifyCsrf|validateCsrf|anti.?forgery|requireAdmin|requireAuth|checkAuth|withAuth|protectRoute|authenticate|x-csrf-protection)[\s\S]){10,}?(?:\.create\s*\(|\.update\s*\(|\.delete\s*\(|\.insert\s*\(|\.upsert\s*\()/g,
+    pattern: /export\s+(?:async\s+)?function\s+(?:POST|PUT|PATCH|DELETE)\s*\([^)]*\)\s*\{(?:(?!csrf|csrfToken|CSRF|x-csrf|verifyCsrf|validateCsrf|anti.?forgery|requireAdmin|requireAuth|checkAuth|withAuth|protectRoute|authenticate|x-csrf-protection|getAuth|currentUser|clerkClient|createServerClient|createServerSupabaseClient|getServerSession|getSession|auth\(\)|getToken|verifyToken|clerkMiddleware)[\s\S]){10,}?(?:\.create\s*\(|\.update\s*\(|\.delete\s*\(|\.insert\s*\(|\.upsert\s*\()/g,
     languages: ["javascript", "typescript"],
     fix: "Add CSRF token verification to state-changing endpoints.",
     fixCode:
@@ -458,7 +458,7 @@ export const advancedSecurityRules: SecurityRule[] = [
     owasp: "A04:2025 Insecure Design",
     description:
       "Rate limiting catch block returns a permissive result (limited: false, success: true) when the rate limit backend (Redis) fails. If Redis goes down, all rate limits are disabled.",
-    pattern: /catch\s*\([^)]*\)\s*\{[\s\S]{0,200}?(?:limited\s*:\s*false|success\s*:\s*true|allowed\s*:\s*true|return\s+(?:false|null|undefined)\s*;?\s*\})/g,
+    pattern: /(?:rateLimit|rateLimiter|limiter|Ratelimit)[\s\S]{0,500}?catch\s*\([^)]*\)\s*\{[\s\S]{0,200}?(?:limited\s*:\s*false|success\s*:\s*true|allowed\s*:\s*true)/g,
     languages: ["javascript", "typescript"],
     fix: "Fail closed: when the rate limiter backend is unavailable, deny the request.",
     fixCode:

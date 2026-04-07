@@ -624,7 +624,7 @@ export const modernStackRules: SecurityRule[] = [
     owasp: "A03:2025 Injection",
     description:
       "User input is interpolated into a Supabase .or() filter string via template literal or concatenation. This is equivalent to SQL injection for PostgREST — attackers can modify filter logic to access unauthorized data.",
-    pattern: /\.or\s*\(\s*(?:`[^`]*\$\{)|\.or\s*\(\s*\w+\s*\)|["'][^"']*["']\s*\+\s*\w+(?:Id|Name|Term|Input)\b[\s\S]{0,100}?\.or\s*\(/gi,
+    pattern: /\.or\s*\(\s*(?:`[^`]*\$\{(?!(?:sfv|sanitize|escape|validate|encodeURIComponent)\s*\())|\.or\s*\(\s*\w+\s*\)|["'][^"']*["']\s*\+\s*\w+(?:Id|Name|Term|Input)\b[\s\S]{0,100}?\.or\s*\(/gi,
     languages: ["javascript", "typescript"],
     fix: "Never interpolate user input into .or() strings. Use separate .eq() filters or build the filter from validated enum values.",
     fixCode:

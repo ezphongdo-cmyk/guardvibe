@@ -92,14 +92,14 @@ describe("AI Benchmark — Phase 2 Semantic Rules", () => {
   describe("VG157 - Rate limit fail-open", () => {
     it("detects catch block returning limited: false", () => {
       assert(hasRule(
-        `try {\n  const result = await redis.incr(key);\n  return { limited: result > max };\n} catch (error) {\n  return { limited: false };\n}`,
+        `const rateLimiter = new Ratelimit({});\ntry {\n  const result = await redis.incr(key);\n  return { limited: result > max };\n} catch (error) {\n  return { limited: false };\n}`,
         "VG157"
       ));
     });
 
     it("detects catch returning success: true", () => {
       assert(hasRule(
-        `try {\n  await ratelimit.check(ip);\n} catch (e) {\n  return { success: true };\n}`,
+        `const ratelimit = new Ratelimit({});\ntry {\n  await ratelimit.check(ip);\n} catch (e) {\n  return { success: true };\n}`,
         "VG157"
       ));
     });
