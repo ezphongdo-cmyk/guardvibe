@@ -327,6 +327,104 @@ export async function runFullAudit(
   };
 }
 
+// --- Inline Remediation Plan (embedded in audit output) ---
+
+interface InlineRemediationStep {
+  section: string;
+  priority: number;
+  findings: number;
+  critical: number;
+  high: number;
+  tool: string;
+  actions: string[];
+}
+
+function buildInlineRemediationPlan(result: AuditResult): InlineRemediationStep[] {
+  const sectionConfig: Record<string, { priority: number; tool: string; actions: string[] }> = {
+    secrets: {
+      priority: 1,
+      tool: "scan_secrets",
+      actions: [
+        "Call scan_secrets with format: json to list all secrets with file locations",
+        "For EACH secret: move to environment variable, add file to .gitignore",
+        "Rotate any API keys/tokens that were committed — they are compromised",
+        "Call scan_secrets_history to check git history for previously committed secrets",
+        "Re-run scan_secrets to confirm 0 secrets remain",
+      ],
+    },
+    code: {
+      priority: 2,
+      tool: "scan_directory",
+      actions: [
+        "Call scan_directory with format: json to get full finding list with fix suggestions",
+        "Fix ALL critical and high severity findings using fix_code for each file",
+        "Call verify_fix after each fix to confirm the vulnerability is resolved",
+        "Re-run scan_directory to confirm findings are resolved",
+      ],
+    },
+    dependencies: {
+      priority: 3,
+      tool: "scan_dependencies",
+      actions: [
+        "Call scan_dependencies with format: json to list vulnerable packages with CVE details",
+        "Run npm audit fix or npm update <package> for each vulnerable dependency",
+        "If a package is abandoned, find an alternative with check_package_health",
+        "Re-run scan_dependencies to confirm 0 CVEs remain",
+      ],
+    },
+    config: {
+      priority: 4,
+      tool: "audit_config",
+      actions: [
+        "Call audit_config with format: json to list all config issues",
+        "Call explain_remediation for each finding to get specific fix guidance",
+        "Apply fixes to next.config, middleware, .env, vercel.json, etc.",
+        "Re-run audit_config to confirm config issues are resolved",
+      ],
+    },
+    taint: {
+      priority: 5,
+      tool: "analyze_cross_file_dataflow",
+      actions: [
+        "Call analyze_cross_file_dataflow to trace tainted data flows from source to sink",
+        "Add input validation (zod/joi) at each source, or output encoding at each sink",
+        "Re-run analyze_cross_file_dataflow to confirm tainted flows are resolved",
+      ],
+    },
+    "auth-coverage": {
+      priority: 6,
+      tool: "auth_coverage",
+      actions: [
+        "Call auth_coverage with format: json to list all unprotected routes",
+        "Add auth guard (Clerk/NextAuth/Supabase) to each unprotected route",
+        "If a route is intentionally public, document it in .guardviberc authExceptions",
+        "Re-run auth_coverage to confirm all routes are protected or documented",
+      ],
+    },
+  };
+
+  const steps: InlineRemediationStep[] = [];
+
+  for (const section of result.sections) {
+    if (section.findings === 0) continue;
+    const config = sectionConfig[section.name];
+    if (!config) continue;
+
+    steps.push({
+      section: section.name,
+      priority: config.priority,
+      findings: section.findings,
+      critical: section.critical,
+      high: section.high,
+      tool: config.tool,
+      actions: config.actions,
+    });
+  }
+
+  steps.sort((a, b) => a.priority - b.priority);
+  return steps;
+}
+
 // --- Formatter ---
 
 /**
@@ -334,6 +432,18 @@ export async function runFullAudit(
  */
 export function formatAuditResult(result: AuditResult, format: "markdown" | "json" | "terminal"): string {
   if (format === "json") {
+    // Embed remediation plan directly in JSON when verdict is not PASS
+    if (result.verdict !== "PASS") {
+      const plan = buildInlineRemediationPlan(result);
+      return JSON.stringify({
+        ...result,
+        remediationPlan: {
+          totalSectionsWithFindings: plan.length,
+          warning: `MANDATORY: You must fix ALL ${plan.length} sections below. Do NOT fix only the code section and skip the rest. Work through each section in priority order. After completing ALL sections, call verify_remediation to confirm.`,
+          steps: plan,
+        },
+      });
+    }
     return JSON.stringify(result);
   }
 
@@ -402,6 +512,31 @@ export function formatAuditResult(result: AuditResult, format: "markdown" | "jso
     lines.push(``);
     for (const item of result.actionItems) {
       lines.push(`- ${item}`);
+    }
+  }
+
+  // Embed remediation plan when verdict is not PASS
+  if (result.verdict !== "PASS") {
+    const plan = buildInlineRemediationPlan(result);
+    if (plan.length > 0) {
+      lines.push(``);
+      lines.push(`## Mandatory Remediation Plan`);
+      lines.push(``);
+      lines.push(`> **IMPORTANT: You MUST fix ALL ${plan.length} sections below. Do NOT fix only the code section and skip the rest. Work through each section in priority order. After completing ALL sections, call \`verify_remediation\` to confirm.**`);
+      lines.push(``);
+
+      for (const step of plan) {
+        lines.push(`### Step ${step.priority}: ${step.section} (${step.findings} findings — ${step.critical} critical, ${step.high} high)`);
+        lines.push(``);
+        for (let i = 0; i < step.actions.length; i++) {
+          lines.push(`${i + 1}. ${step.actions[i]}`);
+        }
+        lines.push(``);
+      }
+
+      lines.push(`### Final verification`);
+      lines.push(``);
+      lines.push(`After completing ALL steps above, call \`verify_remediation\` to confirm every section was addressed. Do NOT declare remediation complete until verify_remediation returns "complete".`);
     }
   }
 
