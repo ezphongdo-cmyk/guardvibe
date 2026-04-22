@@ -242,9 +242,9 @@ All scanning tools support `format: "json"` for machine-readable output.
 | Core OWASP | 38 | SQL injection, XSS, CSRF, command injection, CORS, SSRF, hardcoded secrets |
 | Next.js App Router | 17 | Server Actions, secret exposure, auth bypass, CSP, redirects |
 | Auth (Clerk / Auth.js / Supabase Auth) | 16 | Middleware, secret keys, session storage, role checks, SSR cookies |
-| Database (Supabase / Prisma / Drizzle) | 11 | Raw queries, client exposure, service role leaks, NoSQL injection |
+| Database (Supabase / Prisma / Drizzle) | 12 | Raw queries, client exposure, service role leaks, NoSQL injection, Drizzle identifier injection (CVE-2026-39356) |
 | OWASP API Security | 10 | BOLA/IDOR, mass assignment, pagination, rate limiting, error leaks |
-| Modern Stack | 39 | Zod, tRPC, Hono, GraphQL, Uploadthing, Turso, Convex, OAuth, CSP, webhooks, AI SDK |
+| Modern Stack | 40 | Zod, tRPC, Hono, GraphQL, Uploadthing, Turso, Convex, OAuth, CSP, webhooks, AI SDK, React Server Action validation (React2Shell) |
 | Deployment Config | 21 | Vercel, Next.js config, Docker Compose, Fly, Render, Netlify, Cloudflare, K8s secrets |
 | Payments (Stripe / Polar / Lemon) | 9 | Webhook signatures, key exposure, price manipulation |
 | Services (Resend / Upstash / Pinecone / PostHog) | 11 | API key leaks, PII tracking, email injection |
@@ -254,7 +254,7 @@ All scanning tools support `format: "json"` for machine-readable output.
 | AI / LLM Security | 16 | Prompt injection, MCP SSRF, excessive agency, indirect injection |
 | **AI Host Security** | **10** | **CVE-2025-59536 hook injection, CVE-2026-21852 base URL hijack, MCP config audit** |
 | **AI Tool Runtime** | **4** | **MCP tool output sanitization, obfuscated descriptions, safety bypass** |
-| CVE Version Intelligence | 23 | Known vulnerable versions in package.json (23 CVEs) |
+| CVE Version Intelligence | 27 | Known vulnerable versions in package.json — incl. Axios supply-chain backdoor, Clerk middleware bypass (GHSA-vqx2), Next.js RSC DoS (CVE-2026-23869), Hono CRLF (CVE-2026-29086) |
 | Shell / Bash | 5 | Pipe to bash, chmod 777, rm -rf, sudo password |
 | SQL | 4 | DROP/DELETE without WHERE, stacked queries, GRANT ALL |
 | Supply Chain | 16 | Malicious install scripts, lockfile integrity, dependency confusion, typosquat detection |
