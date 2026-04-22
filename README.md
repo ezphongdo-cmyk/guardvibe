@@ -235,7 +235,7 @@ Malicious postinstall scripts, unpinned GitHub Actions, typosquat detection
 
 All scanning tools support `format: "json"` for machine-readable output.
 
-## Security Rules (335 rules across 25 modules)
+## Security Rules (341 rules across 25 modules)
 
 | Category | Rules | Coverage |
 |----------|-------|----------|

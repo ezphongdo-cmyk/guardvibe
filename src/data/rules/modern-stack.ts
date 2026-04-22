@@ -687,4 +687,19 @@ export const modernStackRules: SecurityRule[] = [
       '// BAD: pattern injection\n.ilike("name", `%${query}%`)\n\n// GOOD: escape special characters\nfunction escapeLike(s: string) {\n  return s.replace(/[%_\\\\]/g, "\\\\$&");\n}\n.ilike("name", `%${escapeLike(query)}%`)',
     compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.1"],
   },
+  {
+    id: "VG1010",
+    name: "React Server Action Without Input Validation (React2Shell Risk)",
+    severity: "critical",
+    owasp: "A02:2025 Injection",
+    description:
+      'Server Action in a "use server" file accepts arguments and passes them to database operations, file system calls, or shell commands without schema validation. CVE-2025-55182 (React2Shell) exploits the React Flight protocol to send crafted payloads to Server Actions — any unvalidated action argument is a direct RCE/injection vector. CVSS 10.0.',
+    pattern:
+      /["']use server["'][\s\S]{0,3000}?export\s+async\s+function\s+\w+\s*\([^)]+\)(?![\s\S]{0,500}?(?:\.parse\s*\(|\.safeParse\s*\(|valibot|superstruct|arktype|yup\.\w+\.validate|assertIs))[\s\S]{0,500}?(?:prisma|db\.|sql`|supabase|exec|spawn|readFile|writeFile|fetch\()/g,
+    languages: ["javascript", "typescript"],
+    fix: 'Validate ALL Server Action arguments with zod or a schema library at the top of every "use server" function. Never trust the deserialized payload.',
+    fixCode:
+      '// BAD: unvalidated Server Action argument\n"use server";\nexport async function updateUser(data: any) {\n  await prisma.user.update({ where: { id: data.id }, data });\n}\n\n// GOOD: validate with zod before any operation\n"use server";\nimport { z } from "zod";\nconst schema = z.object({ id: z.string().uuid(), name: z.string().max(100) });\nexport async function updateUser(raw: unknown) {\n  const data = schema.parse(raw);\n  await prisma.user.update({ where: { id: data.id }, data: { name: data.name } });\n}',
+    compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.2", "PCI-DSS:Req6.5.1"],
+  },
 ];

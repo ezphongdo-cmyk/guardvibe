@@ -160,4 +160,19 @@ export const databaseRules: SecurityRule[] = [
       'import { z } from "zod";\n\n// Validate input before query\nconst schema = z.object({ id: z.string().regex(/^[a-f0-9]{24}$/) });\nconst { id } = schema.parse(req.body);\n\n// Safe query — no raw operators from user input\nconst user = await db.collection("users").findOne({ _id: new ObjectId(id) });',
     compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.1"],
   },
+  {
+    id: "VG1011",
+    name: "Drizzle sql.identifier() / .as() with User Input",
+    severity: "critical",
+    owasp: "A02:2025 Injection",
+    description:
+      "Drizzle ORM's sql.identifier() and .as() accept raw strings for table/column names and aliases. Unlike sql`` tagged templates (which parameterize values), these functions interpolate directly into the SQL string. If user input reaches sql.identifier() or .as(), attackers can inject arbitrary SQL fragments — including UNION SELECT, subqueries, or DDL statements — bypassing ORM-level protections entirely.",
+    pattern:
+      /(?:sql\.identifier|\.as)\s*\(\s*(?!["'`])[^)]*(?:req\.|params\.|query\.|body\.|input|args|user|ctx\.|formData|searchParams)/gi,
+    languages: ["javascript", "typescript"],
+    fix: "Never pass user input to sql.identifier() or .as(). Use a strict allowlist of valid table/column names and validate against it.",
+    fixCode:
+      'import { sql } from "drizzle-orm";\n\n// BAD: user input in identifier\nconst col = req.query.sortBy;\ndb.select().from(sql.identifier(col)); // SQL injection!\n\n// GOOD: allowlist valid identifiers\nconst ALLOWED_COLUMNS = ["name", "email", "created_at"] as const;\nconst col = ALLOWED_COLUMNS.find(c => c === req.query.sortBy);\nif (!col) throw new Error("Invalid column");\ndb.select().from(users).orderBy(users[col]);',
+    compliance: ["SOC2:CC7.1", "PCI-DSS:Req6.5.1"],
+  },
 ];
